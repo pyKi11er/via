@@ -1,41 +1,33 @@
-# VIA – A Transport Simulation Tycoon
+# VIA
 
-## Project summary 
+A [libGDX](https://libgdx.com/) project generated with [gdx-liftoff](https://github.com/libgdx/gdx-liftoff).
 
-The game takes place on a 2-dimensional top-down map featuring cities, industrial facilities, and a
-predefined road network connecting them. The player can build roads, place stops on the road
-network, purchase road vehicles, define routes, and use them to transport goods and/or passengers.
-The game runs in real-time, but the speed of the game can be accelerated.
+This project was generated with a template including simple application launchers and an `ApplicationAdapter` extension that draws libGDX logo.
 
-## Milestones
+## Platforms
 
-1. Milestone (03.02.2026): Requirement analysis and planning: user stories, use case diagram, class diagram, mockups about how the game will look like.
-2. Milestone (03.23.2026): 30% of features are ready, the project is version controlled, uses the Issue board, documentation in the code.
-3. Milestone (04.20.2026): 90% of features are ready, the project is version controlled, uses the Issue board, documentation in the code, CI is used, there are some unit tests.
-4. Milestone (05.11.2026): 100% of features are ready, the project is version controlled, uses the Issue board, documentation in the code, CI is used, comprehensive unit tests, clean code.
+- `core`: Main module with the application logic shared by all platforms.
+- `lwjgl3`: Primary desktop platform using LWJGL3; was called 'desktop' in older docs.
 
-## Visuals
+## Gradle
 
-TBD 
+This project uses [Gradle](https://gradle.org/) to manage dependencies.
+The Gradle wrapper was included, so you can run Gradle tasks using `gradlew.bat` or `./gradlew` commands.
+Useful Gradle tasks and flags:
 
-## Installation
+- `--continue`: when using this flag, errors will not stop the tasks from running.
+- `--daemon`: thanks to this flag, Gradle daemon will be used to run chosen tasks.
+- `--offline`: when using this flag, cached dependency archives will be used.
+- `--refresh-dependencies`: this flag forces validation of all dependencies. Useful for snapshot versions.
+- `build`: builds sources and archives of every project.
+- `cleanEclipse`: removes Eclipse project data.
+- `cleanIdea`: removes IntelliJ project data.
+- `clean`: removes `build` folders, which store compiled classes and built archives.
+- `eclipse`: generates Eclipse project data.
+- `idea`: generates IntelliJ project data.
+- `lwjgl3:jar`: builds application's runnable jar, which can be found at `lwjgl3/build/libs`.
+- `lwjgl3:run`: starts the application.
+- `test`: runs unit tests (if any).
 
-TBD 
-
-## Usage
-
-TBD
-
-## Support
-
-TBD
-
-## Authors and acknowledgment
-
-Worked on Project:
-1. Dragas Vuk ()
-2. Grigoryan Hayk ()
-3. Likhtarov Andrii ()
-4. Murzin Valerii ()
-5. Szendrei Rudolf (Project coordinator)
-
+Note that most tasks that are not specific to a single project can be run with `name:` prefix, where the `name` should be replaced with the ID of a specific project.
+For example, `core:clean` removes `build` folder only from the `core` project.

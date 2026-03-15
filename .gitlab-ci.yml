@@ -1,0 +1,20 @@
+stages:
+  - build
+  - test
+
+build:
+  stage: build
+  image: eclipse-temurin:17-jdk
+  script:
+    - chmod +x gradlew
+    - ./gradlew lwjgl3:classes
+  artifacts:
+    paths:
+      - lwjgl3/build/
+
+test:
+  stage: test
+  image: eclipse-temurin:17-jdk
+  script:
+    - chmod +x gradlew
+    - ./gradlew test

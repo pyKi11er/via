@@ -12,23 +12,32 @@ public class Tile {
         this.structure = structure;
         this.overlay = overlay;
     }
+
     public Terrain getTerrain() {
         return terrain;
     }
+
     public void setTerrain(Terrain terrain) {
         this.terrain = terrain;
     }
+
     public Structure getStructure() {
         return structure;
     }
+
     public void setStructure(Structure structure) {
         this.structure = structure;
     }
+
     public Overlay getOverlay() {
         return overlay;
     }
+
     public void setOverlay(Overlay overlay) {
         this.overlay = overlay;
     }
 
+    public boolean isEmpty() {
+        return structure == null && overlay == null;
+    }
 }

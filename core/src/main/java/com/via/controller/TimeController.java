@@ -2,7 +2,7 @@ package com.via.controller;
 
 import com.via.model.SpeedSetting;
 
-public class TimeController {
+public class    TimeController {
 
     private SpeedSetting speedSetting;
     private boolean paused;

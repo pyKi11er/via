@@ -130,6 +130,26 @@ public class Map {
         return Math.abs(delta) * costPerLevel;
     }
 
+    public int getRoadBuildCost(TileCoord coord, int baseCost, int clearingCostPerTree) {
+        if (baseCost < 0) {
+            throw new IllegalArgumentException("baseCost must not be negative");
+        }
+        if (clearingCostPerTree < 0) {
+            throw new IllegalArgumentException("clearingCostPerTree must not be negative");
+        }
+
+        Tile tile = getRequiredTile(coord);
+        int forestLevel = tile.getTerrain().getForestLevel();
+        return baseCost + (forestLevel * clearingCostPerTree);
+    }
+
+    public int clearForestForRoad(TileCoord coord, int baseCost, int clearingCostPerTree) {
+        Tile tile = getRequiredTile(coord);
+        int cost = getRoadBuildCost(coord, baseCost, clearingCostPerTree);
+        tile.getTerrain().setForestLevel(Terrain.MIN_FOREST_LEVEL);
+        return cost;
+    }
+
     public double getVehicleSpeedMultiplier(TileCoord from, TileCoord to) {
         if (!areAdjacent(from, to)) {
             return 1.0;

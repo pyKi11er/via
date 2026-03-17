@@ -6,7 +6,7 @@ import java.util.List;
 /**
  * Represents a road tile connecting to adjacent road tiles.
  */
-public class Road extends Structure {
+public class Road implements Structure {
 
     private final long baseBuildCost;
     private final TileCoord location;

@@ -5,7 +5,7 @@ import java.util.UUID;
 /**
  * Represents a stop used for loading/unloading passengers or goods.
  */
-public class StopOverlay extends Overlay {
+public class StopOverlay implements Overlay {
 
     private final UUID id;
     private final String name;

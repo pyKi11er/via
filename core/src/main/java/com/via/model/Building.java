@@ -3,7 +3,7 @@ package com.via.model;
 import java.util.List;
 import java.util.UUID;
 
-public abstract class Building {
+public abstract class Building extends Structure{
     public final UUID id;
     public final Footprint footprint;
     public Building(Footprint footprint) {

@@ -33,10 +33,11 @@ public class GameEngine {
         float elapsedMs = (now - lastUpdateTimeMs) * timeController.getTimeMultiplier();
 
         while (elapsedMs >= 16.6f) {
-            simulationSystem.updateTick(gameState);
-            elapsedMs -= 16.6f;
+            int ticks = (int)(elapsedMs / 16.6f);
+            for (int i = 0; i < ticks; i++) {
+                simulationSystem.updateTick(gameState);
+            }
+            lastUpdateTimeMs = now;
         }
-
-        lastUpdateTimeMs = now;
     }
 }

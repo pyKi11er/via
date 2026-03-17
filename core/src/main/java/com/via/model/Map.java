@@ -16,7 +16,7 @@ public class Map {
         this.tiles = new Tile[size.width][size.height];
     }
 
-    public Tile getTiles(TileCoord coord) {
+    public Tile getTile(TileCoord coord) {
         return tiles[coord.x][coord.y];
     }
 

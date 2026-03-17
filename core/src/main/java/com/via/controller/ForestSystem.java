@@ -46,7 +46,7 @@ public class ForestSystem {
         for (int x = 0; x < map.size.width; x++) {
             for (int y = 0; y < map.size.height; y++) {
                 TileCoord sourceCoord = new TileCoord(x, y);
-                Tile sourceTile = map.getTiles(sourceCoord);
+                Tile sourceTile = map.getTile(sourceCoord);
 
                 if (sourceTile == null || sourceTile.getTerrain() == null) {
                     continue;
@@ -63,7 +63,7 @@ public class ForestSystem {
                 }
 
                 for (TileCoord adjacentCoord : map.getAdjacentCoords(sourceCoord)) {
-                    Tile adjacentTile = map.getTiles(adjacentCoord);
+                    Tile adjacentTile = map.getTile(adjacentCoord);
                     if (!canSpreadInto(adjacentTile)) {
                         continue;
                     }

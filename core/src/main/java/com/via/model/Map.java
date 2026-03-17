@@ -97,7 +97,7 @@ public class Map {
             return false;
         }
 
-        Tile tile = getTiles(coord);
+        Tile tile = getTile(coord);
         if (tile == null || !tile.isEmpty()) {
             return false;
         }
@@ -170,7 +170,7 @@ public class Map {
             throw new IllegalArgumentException("Tile coordinate is out of bounds");
         }
 
-        Tile tile = getTiles(coord);
+        Tile tile = getTile(coord);
         if (tile == null) {
             throw new IllegalStateException(
                 "Tile at (" + coord.x + ", " + coord.y + ") has not been initialized"

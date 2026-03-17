@@ -25,7 +25,7 @@ public class StopBuilder {
 
         if (!adjacentRoad) throw new IllegalArgumentException("Stop must be adjacent to a road.");
 
-        economy.deduct(baseCost);
+        economy.decreaseCapital(baseCost);
         tile.setOverlay(new StopOverlay(name, coord, access, storage));
         return true;
     }

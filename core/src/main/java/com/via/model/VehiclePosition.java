@@ -1,58 +1,30 @@
 package com.via.model;
 
 public class VehiclePosition {
-    private TileCoord origin;
-    private TileCoord destination;
+    private TileCoord from;
+    private TileCoord to;
     private float progress;
-
-    public VehiclePosition(TileCoord origin, TileCoord destination) {
-        this.origin = origin;
-        this.destination = destination;
-        this.progress = 0f;
+    public VehiclePosition(TileCoord from, TileCoord to) {
+        this.from = from;
+        this.to = to;
+        this.progress = 0;
     }
-
-    public TileCoord getOrigin() {
-        return origin;
+    public TileCoord getFrom() {
+        return from;
     }
-
-    public void setOrigin(TileCoord origin) {
-        this.origin = origin;
+    public void setFrom(TileCoord from) {
+        this.from = from;
     }
-
-    public TileCoord getDestination() {
-        return destination;
+    public TileCoord getTo() {
+        return to;
     }
-
-    public void setDestination(TileCoord destination) {
-        this.destination = destination;
+    public void setTo(TileCoord to) {
+        this.to = to;
     }
     public float getProgress() {
         return progress;
     }
     public void setProgress(float progress) {
-        if (progress < 0f || progress > 1f) {
-            throw new IllegalArgumentException("progress must be between 0.0 and 1.0");
-        }
         this.progress = progress;
-    }
-
-    /** Backwards-compatible alias; prefer {@link #getOrigin()}. */
-    public TileCoord getFrom() {
-        return origin;
-    }
-
-    /** Backwards-compatible alias; prefer {@link #setOrigin(TileCoord)}. */
-    public void setFrom(TileCoord from) {
-        this.origin = from;
-    }
-
-    /** Backwards-compatible alias; prefer {@link #getDestination()}. */
-    public TileCoord getTo() {
-        return destination;
-    }
-
-    /** Backwards-compatible alias; prefer {@link #setDestination(TileCoord)}. */
-    public void setTo(TileCoord to) {
-        this.destination = to;
     }
 }

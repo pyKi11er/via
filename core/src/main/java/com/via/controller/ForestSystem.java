@@ -76,7 +76,7 @@ public class ForestSystem {
         }
 
         for (TileCoord targetCoord : spreadTargets) {
-            Tile targetTile = map.getTiles(targetCoord);
+            Tile targetTile = map.getTile(targetCoord);
             if (!canSpreadInto(targetTile)) {
                 continue;
             }

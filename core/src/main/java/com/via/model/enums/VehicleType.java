@@ -1,4 +1,4 @@
-package com.via.model.vehicle;
+package com.via.model.enums;
 
 public enum VehicleType {
     BUS,

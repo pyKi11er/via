@@ -10,6 +10,7 @@ public class GameState {
     private List<Building> buildings;
     private PlayerEconomy economy;
     private TimeState timeState;
+    private boolean gameOver;
 
     public GameState(Map map) {
         this.map = map;
@@ -18,6 +19,7 @@ public class GameState {
         buildings = new ArrayList<>();
         economy = new PlayerEconomy();
         timeState = new TimeState();
+        gameOver = false;
     }
     public Map getMap() {
         return map;
@@ -36,6 +38,14 @@ public class GameState {
     }
     public TimeState getTimeState() {
         return timeState;
+    }
+
+    public boolean isGameOver() {
+        return gameOver;
+    }
+
+    public void setGameOver(boolean gameOver) {
+        this.gameOver = gameOver;
     }
 
     public void addVehicle(Vehicle vehicle) {

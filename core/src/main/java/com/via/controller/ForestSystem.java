@@ -1,10 +1,7 @@
 package com.via.controller;
 
 import com.via.model.GameState;
-import com.via.model.Map;
-import com.via.model.Terrain;
-import com.via.model.Tile;
-import com.via.model.TileCoord;
+import com.via.model.map.*;
 import java.util.HashSet;
 import java.util.Objects;
 import java.util.Random;

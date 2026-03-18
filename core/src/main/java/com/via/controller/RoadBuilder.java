@@ -1,6 +1,13 @@
 package com.via.controller;
 
 import com.via.model.*;
+import com.via.model.building.Building;
+import com.via.model.building.Road;
+import com.via.model.economy.PlayerEconomy;
+import com.via.model.map.Map;
+import com.via.model.map.Terrain;
+import com.via.model.map.Tile;
+import com.via.model.map.TileCoord;
 
 /**
  * Handles validation and construction of roads on the map.

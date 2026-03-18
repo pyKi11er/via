@@ -1,6 +1,18 @@
 package com.via.controller;
 
 import com.via.model.*;
+import com.via.model.building.City;
+import com.via.model.building.Facility;
+import com.via.model.building.PassengerDemand;
+import com.via.model.building.StopOverlay;
+import com.via.model.economy.ConsumptionItem;
+import com.via.model.economy.Storage;
+import com.via.model.enums.GoodType;
+import com.via.model.map.Map;
+import com.via.model.map.Structure;
+import com.via.model.map.Tile;
+import com.via.model.map.TileCoord;
+import com.via.model.vehicle.Vehicle;
 
 public class EconomySystem {
 
@@ -32,7 +44,7 @@ public class EconomySystem {
     }
 
     private void processStopDeliveries(GameState state) {
-        com.via.model.Map map = state.getMap();
+        Map map = state.getMap();
         if (map == null) return;
 
         for (int x = 0; x < map.size.width; x++) {
@@ -47,7 +59,7 @@ public class EconomySystem {
         }
     }
 
-    private void deliverToAdjacentDemand(GameState state, com.via.model.Map map, StopOverlay stop) {
+    private void deliverToAdjacentDemand(GameState state, Map map, StopOverlay stop) {
         Storage storage = stop.getStorage();
         if (storage == null) return;
 

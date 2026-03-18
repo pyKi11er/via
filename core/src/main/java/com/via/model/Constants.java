@@ -1,5 +1,7 @@
 package com.via.model;
 
+import com.via.model.enums.GoodType;
+
 public class Constants {
     private Constants() {}
 

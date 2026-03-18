@@ -1,6 +1,6 @@
 package com.via.controller;
 
-import com.via.model.SpeedSetting;
+import com.via.model.enums.SpeedSetting;
 
 public class    TimeController {
 

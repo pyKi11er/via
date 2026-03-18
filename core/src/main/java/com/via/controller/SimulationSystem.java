@@ -3,6 +3,7 @@ package com.via.controller;
 import com.via.model.GameState;
 import java.util.Objects;
 
+
 public class SimulationSystem {
     private final ForestSystem forestSystem;
     private final EconomySystem economySystem;

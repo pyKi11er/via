@@ -36,6 +36,7 @@ public class GameScreen implements Screen {
 
     private static final float CAMERA_SPEED = 200f;
     private static final float TOP_BAR_H = 36f;
+    private static final float BOT_BAR_H = 48f;
 
     // HUD
     private Rectangle btnExit;
@@ -46,6 +47,21 @@ public class GameScreen implements Screen {
     private Rectangle rBtnMainMenu;
     private Rectangle rBtnExitGame;
     private Rectangle rBtnClose;
+
+    // speed controll
+    private Rectangle[] speedBtns = new Rectangle[4];
+    private String[] speedLabels = {"||", ">", ">>", ">>>"};
+    private int activeSpeed = 1;
+
+    // tabs
+    private Rectangle[] tabBtns = new Rectangle[4];
+    private String[] tabLabels = {"Build", "Roads", "Buy", "..."};
+    private int activeTab = -1;
+
+    //popup
+    private boolean showPopup = false;
+    private Rectangle rPopup;
+    private Rectangle rPopupClose;
 
     public GameScreen(VIA game, GameState gameState) {
         this.game = game;
@@ -69,6 +85,23 @@ public class GameScreen implements Screen {
         texPanel.setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear);
 
         buildLayout(Gdx.graphics.getWidth(), Gdx.graphics.getHeight());
+
+        float w = Gdx.graphics.getWidth();
+        float btnW = 40f;
+        float btnH = 30f;
+        float gap  = 4f;
+        float startX = w - (btnW + gap) * 4 - 8f;
+        float y = 8f;
+        for (int i = 0; i < 4; i++) {
+            speedBtns[i] = new Rectangle(startX + i * (btnW + gap), y, btnW, btnH);
+        }
+
+        float tabW = 200f;
+        float tabH = BOT_BAR_H - 10f;
+        float tabY = 5f;
+        for (int i = 0; i < 4; i++) {
+            tabBtns[i] = new Rectangle(8f + i * (tabW + 6f), tabY, tabW, tabH);
+        }
     }
 
     private void buildLayout(int w, int h) {
@@ -91,6 +124,12 @@ public class GameScreen implements Screen {
         rBtnMainMenu = new Rectangle(dX + spacing, bY, bW, bH);
         rBtnExitGame = new Rectangle(dX + spacing * 2f + bW, bY, bW, bH);
         rBtnClose = new Rectangle(dX + spacing * 3f + bW * 2f, bY, bW, bH);
+
+        rPopup = new Rectangle(8f, BOT_BAR_H + 5f, 200f, 150f);
+        rPopupClose = new Rectangle(
+            rPopup.x + rPopup.width - 24f,
+            rPopup.y + rPopup.height - 24f,
+            20f, 20f);
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -119,9 +158,13 @@ public class GameScreen implements Screen {
         batch.setProjectionMatrix(hudCamera.combined);
         sr.setProjectionMatrix(hudCamera.combined);
         drawTopBar();
+        drawBotBar();
 
-        // Dialog on top
         if (showExitDialog) drawExitDialog();
+
+        if (showPopup) drawPopup();
+
+        drawMinimap();
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -152,6 +195,26 @@ public class GameScreen implements Screen {
                 System.out.println("Tile: " + tileX + "," + tileY
                     + " | Terrain: " + tile.getTerrain().getType()
                     + " | Structure: " + tile.getStructure());
+            }
+
+            for (int i = 0; i < 4; i++) {
+                if (speedBtns[i].contains(mx, my)) {
+                    activeSpeed = i;
+                    return;
+                }
+            }
+
+            for (int i = 0; i < 4; i++) {
+                if (tabBtns[i].contains(mx, my)) {
+                    if (activeTab == i && showPopup) {
+                        showPopup = false;
+                        activeTab = -1;
+                    } else {
+                        activeTab = i;
+                        showPopup = true;
+                    }
+                    return;
+                }
             }
         }
     }
@@ -196,6 +259,112 @@ public class GameScreen implements Screen {
             : new Color(1f, 0.25f, 0.25f, 1f));
         font.draw(batch, balStr, w - gl.width - 12f, h - TOP_BAR_H / 2f + gl.height / 2f);
         batch.end();
+    }
+
+    private void drawBotBar() {
+        float w = Gdx.graphics.getWidth();
+
+        sr.begin(ShapeRenderer.ShapeType.Filled);
+        sr.setColor(0.08f, 0.11f, 0.18f, 1f);
+        sr.rect(0, 0, w, BOT_BAR_H);
+        sr.setColor(0.20f, 0.47f, 0.80f, 1f);
+        sr.rect(0, BOT_BAR_H, w, 2f);
+        sr.end();
+
+        batch.begin();
+        for (int i = 0; i < 4; i++) {
+            batch.setColor(i == activeSpeed ? Color.YELLOW : Color.WHITE);
+            batch.draw(texButton, speedBtns[i].x, speedBtns[i].y, speedBtns[i].width, speedBtns[i].height);
+            gl.setText(font, speedLabels[i]);
+            font.setColor(Color.WHITE);
+            font.draw(batch, speedLabels[i],
+                speedBtns[i].x + (speedBtns[i].width - gl.width) / 2f,
+                speedBtns[i].y + (speedBtns[i].height + gl.height) / 2f);
+        }
+        batch.end();
+
+        sr.begin(ShapeRenderer.ShapeType.Filled);
+        for (int i = 0; i < 4; i++) {
+            if (i == activeTab) sr.setColor(0.20f, 0.47f, 0.80f, 1f);
+            else sr.setColor(0.18f, 0.22f, 0.32f, 1f);
+            sr.rect(tabBtns[i].x, tabBtns[i].y, tabBtns[i].width, tabBtns[i].height);
+        }
+        sr.end();
+
+        batch.begin();
+        for (int i = 0; i < 4; i++) {
+            gl.setText(font, tabLabels[i]);
+            float tx = tabBtns[i].x + (tabBtns[i].width  - gl.width)  / 2f;
+            float ty = tabBtns[i].y + (tabBtns[i].height + gl.height) / 2f;
+            font.setColor(Color.WHITE);
+            font.draw(batch, tabLabels[i], tx, ty);
+        }
+        batch.end();
+    }
+
+    private void drawMinimap() {
+        float w = Gdx.graphics.getWidth();
+        float h = Gdx.graphics.getHeight();
+
+        float size = 320f;
+        float x = w - size - 10f;
+        float y = BOT_BAR_H + 10f;
+
+        sr.begin(ShapeRenderer.ShapeType.Filled);
+        sr.setColor(0.07f, 0.10f, 0.17f, 1f);
+        sr.rect(x, y, size, size);
+        sr.end();
+
+        sr.begin(ShapeRenderer.ShapeType.Line);
+        sr.setColor(0.20f, 0.47f, 0.80f, 1f);
+        sr.rect(x, y, size, size);
+        sr.end();
+
+        batch.begin();
+        font.setColor(Color.WHITE);
+        gl.setText(font, "Minimap will be here");
+        font.draw(batch, "Minimap will be here",
+            x + (size - gl.width)  / 2f,
+            y + (size + gl.height) / 2f);
+        batch.end();
+    }
+
+    private void drawPopup() {
+        rPopup = new Rectangle(
+            tabBtns[activeTab].x,
+            BOT_BAR_H + 5f,
+            200f, 150f);
+        rPopupClose = new Rectangle(
+            rPopup.x + rPopup.width - 24f,
+            rPopup.y + rPopup.height - 24f,
+            20f, 20f);
+
+        sr.begin(ShapeRenderer.ShapeType.Filled);
+        sr.setColor(0.07f, 0.10f, 0.17f, 1f);
+        sr.rect(rPopup.x, rPopup.y, rPopup.width, rPopup.height);
+        sr.setColor(0.20f, 0.47f, 0.80f, 1f);
+        sr.rect(rPopup.x, rPopup.y + rPopup.height - 3f, rPopup.width, 3f);
+        sr.setColor(0.60f, 0.15f, 0.15f, 1f);
+        sr.rect(rPopupClose.x, rPopupClose.y, rPopupClose.width, rPopupClose.height);
+        sr.end();
+
+        batch.begin();
+        font.setColor(Color.WHITE);
+        font.draw(batch, tabLabels[activeTab], rPopup.x + 8f, rPopup.y + rPopup.height - 8f);
+        gl.setText(font, "X");
+        font.draw(batch, "X",
+            rPopupClose.x + (rPopupClose.width  - gl.width)  / 2f,
+            rPopupClose.y + (rPopupClose.height + gl.height) / 2f);
+        batch.end();
+
+        if (Gdx.input.justTouched()) {
+            float mx = Gdx.input.getX();
+            float my = Gdx.graphics.getHeight() - Gdx.input.getY();
+            if (rPopupClose.contains(mx, my)) {
+                showPopup = false;
+                activeTab = -1;
+            }
+        }
     }
 
     private void drawExitDialog() {

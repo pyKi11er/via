@@ -6,7 +6,6 @@ import com.via.model.map.Map;
 import com.via.model.vehicle.Route;
 import com.via.model.vehicle.Vehicle;
 
-import java.sql.Array;
 import java.util.ArrayList;
 import java.util.List;
 

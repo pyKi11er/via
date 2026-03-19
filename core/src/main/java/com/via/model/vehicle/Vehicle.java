@@ -1,6 +1,7 @@
 package com.via.model.vehicle;
 
 import com.via.model.building.StopOverlay;
+import com.via.model.enums.VehicleType;
 
 import java.util.UUID;
 

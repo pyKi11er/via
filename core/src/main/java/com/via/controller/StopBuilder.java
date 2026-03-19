@@ -24,7 +24,9 @@ public class StopBuilder {
 
     public boolean placeStop(String name, TileCoord coord, StopAccess access, Storage storage) {
         Tile tile = map.getTile(coord);
-        if (tile == null || !tile.isEmpty()) return false;
+
+        if (tile == null || !(tile.getStructure() instanceof Road) || tile.getOverlay() != null)
+            return false;
 
         // Must have at least one adjacent road
         boolean adjacentRoad = map.getAdjacentCoords(coord).stream()

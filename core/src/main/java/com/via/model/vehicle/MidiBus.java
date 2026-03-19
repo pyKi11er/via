@@ -1,5 +1,7 @@
 package com.via.model.vehicle;
 
+import com.via.model.enums.VehicleType;
+
 public class MidiBus extends Vehicle {
     public MidiBus(VehiclePosition position) {
         super(

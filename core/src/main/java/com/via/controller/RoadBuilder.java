@@ -32,14 +32,10 @@ public class RoadBuilder {
         if (tile == null)
             throw new IllegalArgumentException("Invalid coordinate: " + coord.x + "," + coord.y);
 
-        if (tile.getStructure() instanceof Building
-            /*|| tile.getStructure() instanceof Facility
-            || tile.getStructure() instanceof City*/) {
+        if (tile.getStructure() instanceof Building) {
             throw new IllegalArgumentException("Cannot build roads on city or facility tiles.");
         }
-
-        if (!tile.isEmpty())
-            return false; // cannot overwrite structures or stops
+        if (!tile.isEmpty()) return false;
 
         // Calculate and deduct cost
         int cost = map.getRoadBuildCost(coord, baseCost, clearingCostPerTree);

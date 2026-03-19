@@ -37,8 +37,8 @@ public class MainMenuScreen extends InputAdapter implements Screen {
     private java.util.List<com.badlogic.gdx.Graphics.DisplayMode> cachedModes = new java.util.ArrayList<>();
 
     private boolean focusPlayer = true;
-    private String playerName = "";
-    private String tycoonName = "";
+    private String playerName = "Player";
+    private String tycoonName = "Tycoon";
 
     private float width;
     private float height;
@@ -443,8 +443,6 @@ public class MainMenuScreen extends InputAdapter implements Screen {
             if (rNew.contains(mx, my)) {
                 dialog = Dialog.NEW_GAME;
                 focusPlayer = true;
-                playerName = "";
-                tycoonName = "";
                 return true;
             }
             if (rLoad.contains(mx, my)) {

@@ -22,33 +22,33 @@ import com.via.model.map.TileCoord;
 
 public class GameScreen implements Screen {
 
-    private final VIA              game;
-    private final GameState        gameState;
+    private final VIA game;
+    private final GameState gameState;
     private final OrthographicCamera mapCamera;
     private final OrthographicCamera hudCamera;
-    private final SpriteBatch      batch;
+    private final SpriteBatch batch;
     private final WorldMapRenderer renderer;
-    private final ShapeRenderer    sr;
-    private final BitmapFont       font;
-    private final GlyphLayout      gl;
-    private final Texture          texButton;
-    private final Texture          texPanel;
+    private final ShapeRenderer sr;
+    private final BitmapFont font;
+    private final GlyphLayout gl;
+    private final Texture texButton;
+    private final Texture texPanel;
 
     private static final float CAMERA_SPEED = 200f;
-    private static final float TOP_BAR_H    = 36f;
+    private static final float TOP_BAR_H = 36f;
 
     // HUD
     private Rectangle btnExit;
 
     // Exit dialog
-    private boolean   showExitDialog = false;
+    private boolean showExitDialog = false;
     private Rectangle rDialog;
     private Rectangle rBtnMainMenu;
     private Rectangle rBtnExitGame;
     private Rectangle rBtnClose;
 
     public GameScreen(VIA game, GameState gameState) {
-        this.game      = game;
+        this.game = game;
         this.gameState = gameState;
 
         mapCamera = new OrthographicCamera();
@@ -56,17 +56,17 @@ public class GameScreen implements Screen {
         hudCamera = new OrthographicCamera();
         hudCamera.setToOrtho(false, Gdx.graphics.getWidth(), Gdx.graphics.getHeight());
 
-        batch    = new SpriteBatch();
+        batch = new SpriteBatch();
         renderer = new WorldMapRenderer(batch, mapCamera);
-        sr       = new ShapeRenderer();
-        font     = new BitmapFont();
+        sr = new ShapeRenderer();
+        font = new BitmapFont();
         font.getData().setScale(1.4f);
-        gl       = new GlyphLayout();
+        gl = new GlyphLayout();
 
         texButton = new Texture(Gdx.files.internal("button.png"));
-        texPanel  = new Texture(Gdx.files.internal("panel.png"));
+        texPanel = new Texture(Gdx.files.internal("panel.png"));
         texButton.setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear);
-        texPanel .setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear);
+        texPanel.setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear);
 
         buildLayout(Gdx.graphics.getWidth(), Gdx.graphics.getHeight());
     }
@@ -88,9 +88,9 @@ public class GameScreen implements Screen {
         float bW = 110f, bH = 46f;
         float bY = dY + 20f;
         float spacing = (dW - bW * 3f) / 4f;
-        rBtnMainMenu = new Rectangle(dX + spacing,                  bY, bW, bH);
-        rBtnExitGame = new Rectangle(dX + spacing * 2f + bW,        bY, bW, bH);
-        rBtnClose    = new Rectangle(dX + spacing * 3f + bW * 2f,   bY, bW, bH);
+        rBtnMainMenu = new Rectangle(dX + spacing, bY, bW, bH);
+        rBtnExitGame = new Rectangle(dX + spacing * 2f + bW, bY, bW, bH);
+        rBtnClose = new Rectangle(dX + spacing * 3f + bW * 2f, bY, bW, bH);
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -117,7 +117,7 @@ public class GameScreen implements Screen {
 
         // HUD — switch to hudCamera
         batch.setProjectionMatrix(hudCamera.combined);
-        sr   .setProjectionMatrix(hudCamera.combined);
+        sr.setProjectionMatrix(hudCamera.combined);
         drawTopBar();
 
         // Dialog on top
@@ -163,7 +163,7 @@ public class GameScreen implements Screen {
 
         if (rBtnMainMenu.contains(mx, my)) { game.setScreen(new MainMenuScreen(game)); return; }
         if (rBtnExitGame.contains(mx, my)) { Gdx.app.exit(); return; }
-        if (rBtnClose   .contains(mx, my)) { showExitDialog = false; }
+        if (rBtnClose.contains(mx, my)) { showExitDialog = false; }
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -263,7 +263,8 @@ public class GameScreen implements Screen {
         float x = cx - gl.width / 2f;
         batch.begin();
         font.setColor(0f, 0f, 0f, 0.85f); font.draw(batch, text, x+2, y-2);
-        font.setColor(color);              font.draw(batch, text, x,   y);
+        font.setColor(color);
+        font.draw(batch, text, x,   y);
         batch.end();
     }
 

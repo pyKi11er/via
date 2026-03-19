@@ -15,7 +15,6 @@ import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.math.Rectangle;
 import com.via.VIA;
 import com.via.controller.MapInitializer;
-import com.via.view.GameScreen;
 
 public class MainMenuScreen extends InputAdapter implements Screen {
     private final VIA game;
@@ -544,7 +543,7 @@ public class MainMenuScreen extends InputAdapter implements Screen {
         }
         Gdx.app.log("VIA", "Start: " + playerName);
         dialog = Dialog.NONE;
-        game.setScreen(new GameScreen(MapInitializer.createNewGame()));
+        game.setScreen(new GameScreen(game, MapInitializer.createNewGame()));
     }
 
     private void changeResolution(int direction) {

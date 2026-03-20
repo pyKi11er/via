@@ -1,5 +1,6 @@
 package com.via.controller;
 
+import com.via.model.Constants;
 import com.via.model.GameState;
 import com.via.model.building.Road;
 import com.via.model.building.StopOverlay;
@@ -34,12 +35,12 @@ public class VehicleMovementSystem {
     // temporary cache for per-vehicle planned paths (tile-by-tile)
     private final java.util.Map<UUID, Queue<TileCoord>> pathCache = new HashMap<>();
 
-    public void tick(GameState state) {
+    public void tick(GameState state, float timeMultiplier) {
+        float delta = BASE_DELTA * timeMultiplier;
         if (state == null || state.isGameOver()) return;
 
         Map map = state.getMap();
         PlayerEconomy economy = state.getEconomy();
-
         occupancy.clear();
 
         // Register current occupancy
@@ -53,16 +54,16 @@ public class VehicleMovementSystem {
             VehiclePosition pos = v.getPosition();
             if (pos == null) continue;
 
-            updateVehicleMovement(state, v, pos, map, economy);
+            updateVehicleMovement(state, v, pos, map, economy, delta);
         }
     }
 
-    private void updateVehicleMovement(GameState state, Vehicle v, VehiclePosition pos, Map map, PlayerEconomy economy) {
+    private void updateVehicleMovement(GameState state, Vehicle v, VehiclePosition pos, Map map, PlayerEconomy economy, float delta) {
         float speed = v.getSpeed();
         double slopeFactor = map.getVehicleSpeedMultiplier(pos.getOrigin(), pos.getDestination());
         float appliedSpeed = (float) (speed * slopeFactor);
 
-        float newProgress = pos.getProgress() + appliedSpeed * BASE_DELTA;
+        float newProgress = pos.getProgress() + appliedSpeed * delta;
         if (newProgress < 1f) {
             pos.setProgress(newProgress);
             return;
@@ -115,9 +116,9 @@ public class VehicleMovementSystem {
         v.setCargo(null);
         // Income now handled by EconomySystem during its tick (stop deliveries)
         // Optional: immediate small delivery bonus
-        long baseIncome = cargo.getAmount() *
-            com.via.model.Constants.getBaseIncomePerUnit(cargo.getType());
-        economy.earn(baseIncome);
+//        long baseIncome = cargo.getAmount() *
+//            Constants.getBaseIncomePerUnit(cargo.getType());
+//        economy.earn(baseIncome);
     }
 
     private void loadFromStop(Vehicle v, StopOverlay stop) {

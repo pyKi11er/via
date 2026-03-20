@@ -1,43 +1,44 @@
 package com.via.controller;
 
 import com.via.model.GameState;
+
 import java.util.Objects;
 
-
 public class SimulationSystem {
+
     private final ForestSystem forestSystem;
-    private final EconomySystem economySystem;
     private final FacilitySystem facilitySystem;
+    private final EconomySystem economySystem;
     private final VehicleMovementSystem vehicleMovementSystem;
 
     public SimulationSystem() {
-        this(new ForestSystem(), new EconomySystem(), new FacilitySystem(), new VehicleMovementSystem());
+        this(new ForestSystem(), new FacilitySystem(),
+            new EconomySystem(), new VehicleMovementSystem());
     }
 
-    public SimulationSystem(ForestSystem forestSystem, EconomySystem economySystem,  FacilitySystem facilitySystem,  VehicleMovementSystem vehicleMovementSystem) {
-        this.forestSystem = Objects.requireNonNull(forestSystem, "forestSystem must not be null");
-        this.economySystem = Objects.requireNonNull(economySystem, "economySystem must not be null");
-        this.facilitySystem = Objects.requireNonNull(facilitySystem, "facilitySystem must not be null");
-        this.vehicleMovementSystem = Objects.requireNonNull(vehicleMovementSystem, "vehicleMovementSystem must not be null");
+    public SimulationSystem(ForestSystem forestSystem,
+                            FacilitySystem facilitySystem,
+                            EconomySystem economySystem,
+                            VehicleMovementSystem vehicleMovementSystem) {
+        this.forestSystem          = Objects.requireNonNull(forestSystem);
+        this.facilitySystem        = Objects.requireNonNull(facilitySystem);
+        this.economySystem         = Objects.requireNonNull(economySystem);
+        this.vehicleMovementSystem = Objects.requireNonNull(vehicleMovementSystem);
     }
 
-    /** Advances one simulation tick. */
-    public void updateTick(GameState state) {
+    /**
+     * Advances one simulation tick.
+     * timeMultiplier is forwarded to VehicleMovementSystem so vehicles
+     * move faster at 2x / 4x speed settings.
+     */
+    public void updateTick(GameState state, float timeMultiplier) {
         if (state == null) return;
-        if (state.isGameOver()) return;
 
-        // Advance simulation time
         state.getTimeState().incrementTick();
+
         forestSystem.tick(state);
-        economySystem.tick(state);
         facilitySystem.tick(state);
-        vehicleMovementSystem.tick(state);
-        // Future expansions:
-        // - Move vehicles along routes
-        // - Process facility production/consumption
-        // - Update economy flows
-        // - Adjust city demand
+        economySystem.tick(state);
+        vehicleMovementSystem.tick(state, timeMultiplier);
     }
 }
-
-

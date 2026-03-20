@@ -35,8 +35,12 @@ public class SimulationSystem {
         this.vehicleMaintenanceSystem = Objects.requireNonNull(vehicleMaintenanceSystem, "vehicleMaintenanceSystem must not be null");
     }
 
-    /** Advances one simulation tick. */
-    public void updateTick(GameState state) {
+    /**
+     * Advances one simulation tick.
+     * timeMultiplier is forwarded to VehicleMovementSystem so vehicles
+     * move faster at 2x / 4x speed settings.
+     */
+    public void updateTick(GameState state, float timeMultiplier) {
         if (state == null) return;
         if (state.isGameOver()) return;
 
@@ -45,19 +49,19 @@ public class SimulationSystem {
         forestSystem.tick(state);
 
         // Maintenance age progression, garage reroutes, and selling happen before economy + movement.
-        vehicleMaintenanceSystem.tickBeforeMovement(state);
-
         economySystem.tick(state);
+        vehicleMaintenanceSystem.tickBeforeMovement(state);
         facilitySystem.tick(state);
-        vehicleMovementSystem.tick(state);
-
-        // Restore routes after vehicles reach garage service points.
+        vehicleMovementSystem.tick(state,timeMultiplier);
         vehicleMaintenanceSystem.tickAfterMovement(state);
+        // Restore routes after vehicles reach garage service points.
         // Future expansions:
         // - Move vehicles along routes
         // - Process facility production/consumption
         // - Update economy flows
         // - Adjust city demand
+        economySystem.tick(state);
+        vehicleMovementSystem.tick(state, timeMultiplier);
     }
 }
 

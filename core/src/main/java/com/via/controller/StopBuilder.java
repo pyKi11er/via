@@ -23,8 +23,10 @@ public class StopBuilder {
     }
 
     public boolean placeStop(String name, TileCoord coord, StopAccess access, Storage storage) {
-        Tile tile = map.getTile(coord);
 
+        Tile tile = map.getTile(coord);
+        System.out.println("Stop placed at: " + coord.x + "," + coord.y
+            + " on road: " + (tile.getStructure() instanceof Road));
         if (tile == null || !(tile.getStructure() instanceof Road) || tile.getOverlay() != null)
             return false;
 

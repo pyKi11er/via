@@ -27,15 +27,24 @@ public class GameEngine {
     }
 
     public void update() {
-        if (timeController.isPaused()) return;
+        // When paused, keep resetting the timer so we don't accumulate
+        // a huge elapsed time that fires hundreds of ticks on unpause
+        if (timeController.isPaused()) {
+            lastUpdateTimeMs = TimeUtils.millis();
+            return;
+        }
 
         long now = TimeUtils.millis();
-        float elapsedMs = (now - lastUpdateTimeMs) * timeController.getTimeMultiplier();
+        long rawElapsedMs = now - lastUpdateTimeMs;
+        float elapsedMs = rawElapsedMs * timeController.getTimeMultiplier();
 
-        while (elapsedMs >= 16.6f) {
-            int ticks = (int)(elapsedMs / 16.6f);
+        // Fire ticks only when enough simulated time has passed (~60 ticks/s)
+        // Use IF not WHILE to avoid infinite loop — cap at a sane number of
+        // ticks per frame so a long GC pause doesn't cause a spiral
+        if (elapsedMs >= 16.6f) {
+            int ticks = Math.min((int)(elapsedMs / 16.6f), 10); // cap at 10 per frame
             for (int i = 0; i < ticks; i++) {
-                simulationSystem.updateTick(gameState);
+                simulationSystem.updateTick(gameState, timeController.getTimeMultiplier());
             }
             lastUpdateTimeMs = now;
         }

@@ -14,16 +14,14 @@ import com.via.model.map.TileCoord;
 import com.via.model.vehicle.Route;
 import com.via.model.vehicle.Vehicle;
 
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Queue;
-import java.util.Set;
+import java.util.*;
 
 /**
  * Handles vehicle age, maintenance due ticks, garage rerouting, and over-aged selling.
+ *
+ * KEY FIX: findNearestGarageAccessTile() now returns the ROAD TILE adjacent
+ * to the garage, not the garage tile itself. VehicleMovementSystem BFS can only
+ * traverse road tiles so routing to the garage tile directly always fails.
  */
 public class VehicleMaintenanceSystem {
 
@@ -40,10 +38,9 @@ public class VehicleMaintenanceSystem {
             Vehicle v = it.next();
             if (v == null) continue;
 
-            // Age progression (1 simulation tick per update).
             v.incrementAgeTicks(1);
 
-            // Sell immediately when over-aged.
+            // Sell immediately when over-aged
             if (v.isOverAged()) {
                 long resale = v.getResaleValue();
                 if (resale > 0) state.getEconomy().earn(resale);
@@ -52,24 +49,30 @@ public class VehicleMaintenanceSystem {
             }
 
             if (v.isReturningToGarage()) continue;
-
             if (currentTick < v.getMaintenanceDueTick()) continue;
 
-            // Pay maintenance and schedule the next due tick (maintenance interval becomes more frequent with age).
+            // Pay maintenance and reschedule
             state.getEconomy().deduct(v.getMaintenanceCost());
             v.rescheduleNextMaintenanceDueTick(currentTick);
 
-            GarageAccess nearest = findNearestGarageTile(state, v.getPosition().getOrigin());
-            if (nearest == null) continue;
+            // Find the nearest road tile that is adjacent to a garage
+            GarageAccess access = findNearestGarageAccessTile(state, v.getPosition().getOrigin());
+            if (access == null) continue;
 
+            // The stop is on the ROAD TILE next to the garage — BFS can reach this
             StopOverlay garageStop = new StopOverlay(
                 "Garage",
-                nearest.garageTile,
-                new StopAccess(AccessType.ROAD_TILE, nearest.garage.getLocation(), computeDirection(nearest.garage.getLocation(), nearest.garageTile)),
+                access.accessRoadTile,  // road tile, not garage tile
+                new StopAccess(
+                    AccessType.ROAD_TILE,
+                    access.garageTile,
+                    computeDirection(access.garageTile, access.accessRoadTile)
+                ),
                 null
             );
+
             Route maintenanceRoute = new Route(List.of(garageStop));
-            v.enterGarageReturn(maintenanceRoute, nearest.garageTile);
+            v.enterGarageReturn(maintenanceRoute, access.accessRoadTile);
         }
     }
 
@@ -86,35 +89,29 @@ public class VehicleMaintenanceSystem {
         }
     }
 
-    private static class GarageAccess {
-        final Garage garage;
-        final TileCoord garageTile;
+    // ══════════════════════════════════════════════════════════════════════════
+    // Data holder
+    // ══════════════════════════════════════════════════════════════════════════
 
-        GarageAccess(Garage garage, TileCoord garageTile) {
-            this.garage = garage;
-            this.garageTile = garageTile;
+    private static class GarageAccess {
+        /** The actual garage tile (non-road). */
+        final TileCoord garageTile;
+        /** The road tile directly adjacent to the garage — this is the BFS goal. */
+        final TileCoord accessRoadTile;
+
+        GarageAccess(TileCoord garageTile, TileCoord accessRoadTile) {
+            this.garageTile      = garageTile;
+            this.accessRoadTile  = accessRoadTile;
         }
     }
 
-    private GarageAccess findNearestGarageTile(GameState state, TileCoord startTile) {
+    // ══════════════════════════════════════════════════════════════════════════
+    // BFS — finds nearest ROAD TILE that is adjacent to a garage
+    // ══════════════════════════════════════════════════════════════════════════
+
+    private GarageAccess findNearestGarageAccessTile(GameState state, TileCoord startTile) {
         Map map = state.getMap();
         if (map == null || startTile == null) return null;
-
-        // Index all tiles occupied by garages directly from the map structure.
-        // This keeps maintenance routing working even if building lists aren't populated.
-        HashMap<TileCoord, Garage> garageIndex = new HashMap<>();
-        for (int x = 0; x < map.size.width; x++) {
-            for (int y = 0; y < map.size.height; y++) {
-                TileCoord coord = new TileCoord(x, y);
-                Tile t = map.getTile(coord);
-                if (t == null) continue;
-                if (t.getStructure() instanceof Garage g) {
-                    garageIndex.putIfAbsent(coord, g);
-                }
-            }
-        }
-
-        if (garageIndex.isEmpty()) return null;
 
         Set<TileCoord> visited = new HashSet<>();
         Queue<TileCoord> q = new LinkedList<>();
@@ -124,36 +121,49 @@ public class VehicleMaintenanceSystem {
 
         while (!q.isEmpty()) {
             TileCoord cur = q.poll();
-            if (garageIndex.containsKey(cur)) {
-                return new GarageAccess(garageIndex.get(cur), cur);
+
+            // Check each neighbour of this road tile — if any is a garage we found our target
+            for (TileCoord neighbor : map.getAdjacentCoords(cur)) {
+                if (isGarageTile(map, neighbor)) {
+                    // cur is the road tile next to the garage — this is our access point
+                    return new GarageAccess(neighbor, cur);
+                }
             }
 
+            // Continue BFS only along road tiles
             for (TileCoord neighbor : map.getAdjacentCoords(cur)) {
-                if (visited.contains(neighbor)) continue;
-                if (!isRoadTile(map, neighbor)) continue;
-                visited.add(neighbor);
-                q.add(neighbor);
+                if (!visited.contains(neighbor) && isRoadTile(map, neighbor)) {
+                    visited.add(neighbor);
+                    q.add(neighbor);
+                }
             }
         }
 
-        return null;
+        return null; // no garage reachable from road network
     }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // Helpers
+    // ══════════════════════════════════════════════════════════════════════════
 
     private boolean isRoadTile(Map map, TileCoord c) {
         if (map == null || c == null) return false;
         Tile t = map.getTile(c);
-        if (t == null) return false;
-        Structure s = t.getStructure();
-        return s instanceof Road || s instanceof Garage;
+        return t != null && t.getStructure() instanceof Road;
     }
 
-    private Direction computeDirection(TileCoord anchor, TileCoord roadTile) {
-        if (anchor == null || roadTile == null) return Direction.N;
-        if (roadTile.x == anchor.x && roadTile.y == anchor.y - 1) return Direction.N;
-        if (roadTile.x == anchor.x && roadTile.y == anchor.y + 1) return Direction.S;
-        if (roadTile.x == anchor.x - 1 && roadTile.y == anchor.y) return Direction.W;
-        if (roadTile.x == anchor.x + 1 && roadTile.y == anchor.y) return Direction.E;
+    private boolean isGarageTile(Map map, TileCoord c) {
+        if (map == null || c == null) return false;
+        Tile t = map.getTile(c);
+        return t != null && t.getStructure() instanceof Garage;
+    }
+
+    private Direction computeDirection(TileCoord from, TileCoord to) {
+        if (from == null || to == null) return Direction.N;
+        if (to.x == from.x && to.y == from.y - 1) return Direction.N;
+        if (to.x == from.x && to.y == from.y + 1) return Direction.S;
+        if (to.x == from.x - 1 && to.y == from.y) return Direction.W;
+        if (to.x == from.x + 1 && to.y == from.y) return Direction.E;
         return Direction.N;
     }
 }
-

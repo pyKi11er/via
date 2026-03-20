@@ -1,70 +1,111 @@
 package com.via.view;
 
+import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.via.model.Constants;
 import com.via.model.GameState;
-import com.via.model.building.Garage;
-import com.via.model.building.City;
-import com.via.model.building.Facility;
-import com.via.model.building.Road;
+import com.via.model.building.*;
 import com.via.model.enums.Direction;
+import com.via.model.enums.VehicleType;
 import com.via.model.map.*;
 import com.via.model.vehicle.Vehicle;
 import com.via.model.vehicle.VehiclePosition;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public class WorldMapRenderer {
-    private static final int TILE_SIZE = Constants.TILE_SIZE;
+
+    private static final int TILE_SIZE   = Constants.TILE_SIZE;
     private static final int SPRITE_SIZE = 8;
 
-    private final SpriteBatch batch;
+    private final SpriteBatch        batch;
     private final OrthographicCamera camera;
-    private Texture tilesheet;
-    private TextureRegion[][] tiles;
-    private TextureRegion[] roadSprites;
+
+    private final Texture            fallbackSheet;
+    private final TextureRegion[][]  fallbackTiles;
+    private final List<Texture>      ownedTextures = new ArrayList<>();
+
+    // Terrain
+    private final TextureRegion   texGrass;
+    private final TextureRegion   texSlopeN, texSlopeS, texSlopeE, texSlopeW;
+    private final TextureRegion[] texForest = new TextureRegion[4];
+
+    // Roads
+    private final TextureRegion[] roadSprites = new TextureRegion[16];
+
+    // Buildings
+    private final TextureRegion texCityTile;
+    private final TextureRegion texFacilityTile;
+
+    // Overlays
+    private final TextureRegion texStop;
+
+    // Vehicles — 4 directions (N=0 E=1 S=2 W=3)
+    private final TextureRegion[] truckSprites = new TextureRegion[4];
+    private final TextureRegion[] busSprites   = new TextureRegion[4];
 
     public WorldMapRenderer(SpriteBatch batch, OrthographicCamera camera) {
-        this.batch = batch;
+        this.batch  = batch;
         this.camera = camera;
-        tilesheet = new Texture("tilemap_packed.png");
-        tilesheet.setFilter(Texture.TextureFilter.Nearest, Texture.TextureFilter.Nearest);
-        tiles = TextureRegion.split(tilesheet, SPRITE_SIZE, SPRITE_SIZE);
-        roadSprites = new TextureRegion[16];
-        // key 0 = no connections (isolated road)
-        roadSprites[0] = tiles[7][3];   // plain gray
-        // key 1 = W only
-        roadSprites[1] = tiles[7][3];   // horizontal
-        // key 2 = S only
-        roadSprites[2] = tiles[7][3];   // vertical
-        // key 3 = S+W
-        roadSprites[3] = tiles[7][3];   // corner
-        // ... all 16 entries
-        // For now just put tiles[7][3] for all of them
-        for (int i = 0; i < 16; i++) {
-            roadSprites[i] = tiles[7][3];
-        }
+
+        fallbackSheet = new Texture("tilemap_packed.png");
+        fallbackSheet.setFilter(Texture.TextureFilter.Nearest, Texture.TextureFilter.Nearest);
+        fallbackTiles = TextureRegion.split(fallbackSheet, SPRITE_SIZE, SPRITE_SIZE);
+
+        texGrass  = load("terrain/grass.png",   fallbackTiles[0][0]);
+        texSlopeN = load("terrain/slope_n.png", fallbackTiles[0][2]);
+        texSlopeS = load("terrain/slope_s.png", fallbackTiles[0][2]);
+        texSlopeE = load("terrain/slope_e.png", fallbackTiles[0][2]);
+        texSlopeW = load("terrain/slope_w.png", fallbackTiles[0][2]);
+        texForest[0] = load("terrain/forest_1.png", fallbackTiles[0][0]);
+        texForest[1] = load("terrain/forest_2.png", fallbackTiles[0][0]);
+        texForest[2] = load("terrain/forest_3.png", fallbackTiles[0][0]);
+        texForest[3] = load("terrain/forest_4.png", fallbackTiles[0][0]);
+
+        texCityTile     = load("buildings/city_tile.png",     fallbackTiles[2][0]);
+        texFacilityTile = load("buildings/facility_tile.png", fallbackTiles[3][4]);
+        texStop         = load("overlays/stop.png",           fallbackTiles[7][4]);
+
+        truckSprites[0] = load("vehicles/truck_n.png", fallbackTiles[9][8]);
+        truckSprites[1] = load("vehicles/truck_e.png", fallbackTiles[9][8]);
+        truckSprites[2] = load("vehicles/truck_s.png", fallbackTiles[9][8]);
+        truckSprites[3] = load("vehicles/truck_w.png", fallbackTiles[9][8]);
+        busSprites[0]   = load("vehicles/bus_n.png",   fallbackTiles[9][9]);
+        busSprites[1]   = load("vehicles/bus_e.png",   fallbackTiles[9][9]);
+        busSprites[2]   = load("vehicles/bus_s.png",   fallbackTiles[9][9]);
+        busSprites[3]   = load("vehicles/bus_w.png",   fallbackTiles[9][9]);
+
+        buildRoadSpriteTable();
     }
 
-    private TextureRegion getTerrainSprite(Terrain terrain) {
-        // tiles[row][col] — look at spritesheet
-        // figure out which row/col is grass, road, etc.
-        if (terrain == null) return tiles[0][0];
-        switch (terrain.getType()) {
-            case FLAT:
-                if (terrain.getForestLevel() > 0) return tiles[0][0]; // green with trees later
-                return tiles[0][0]; // plain grass
-            case SLOPE_NORTH:
-            case SLOPE_SOUTH:
-            case SLOPE_EAST:
-            case SLOPE_WEST:
-                return tiles[0][2]; // gray pavement as placeholder for slopes
-            default:
-                return tiles[0][0];
-        }
+    private void buildRoadSpriteTable() {
+        TextureRegion cross = load("roads/road_cross.png",      fallbackTiles[7][4]);
+        TextureRegion tN    = load("roads/road_t_n.png",        fallbackTiles[7][3]);
+        TextureRegion tS    = load("roads/road_t_s.png",        fallbackTiles[7][3]);
+        TextureRegion tE    = load("roads/road_t_e.png",        fallbackTiles[7][3]);
+        TextureRegion tW    = load("roads/road_t_w.png",        fallbackTiles[7][3]);
+        TextureRegion strH  = load("roads/road_straight_h.png", fallbackTiles[7][3]);
+        TextureRegion strV  = load("roads/road_straight_v.png", fallbackTiles[7][3]);
+        TextureRegion cNE   = load("roads/road_corner_ne.png",  fallbackTiles[7][3]);
+        TextureRegion cNW   = load("roads/road_corner_nw.png",  fallbackTiles[7][3]);
+        TextureRegion cSE   = load("roads/road_corner_se.png",  fallbackTiles[7][3]);
+        TextureRegion cSW   = load("roads/road_corner_sw.png",  fallbackTiles[7][3]);
+        TextureRegion endN  = load("roads/road_end_n.png",      fallbackTiles[7][3]);
+        TextureRegion endS  = load("roads/road_end_s.png",      fallbackTiles[7][3]);
+        TextureRegion endE  = load("roads/road_end_e.png",      fallbackTiles[7][3]);
+        TextureRegion endW  = load("roads/road_end_w.png",      fallbackTiles[7][3]);
+        TextureRegion alone = load("roads/road_alone.png",      fallbackTiles[7][3]);
+
+        roadSprites[0]  = alone; roadSprites[1]  = endW;  roadSprites[2]  = endS;
+        roadSprites[3]  = cSW;   roadSprites[4]  = endE;  roadSprites[5]  = strH;
+        roadSprites[6]  = cSE;   roadSprites[7]  = tS;    roadSprites[8]  = endN;
+        roadSprites[9]  = cNW;   roadSprites[10] = strV;  roadSprites[11] = tW;
+        roadSprites[12] = cNE;   roadSprites[13] = tN;    roadSprites[14] = tE;
+        roadSprites[15] = cross;
     }
 
     public void render(GameState state) {
@@ -77,80 +118,112 @@ public class WorldMapRenderer {
     }
 
     private void renderTiles(Map map) {
-        for(int x = 0; x < map.size.width; x++){
-            for(int y = 0; y < map.size.height; y++){
+        for (int x = 0; x < map.size.width; x++) {
+            for (int y = 0; y < map.size.height; y++) {
                 TileCoord coord = new TileCoord(x, y);
                 Tile tile = map.getTile(coord);
-                if(tile == null) continue;
-
-                float screenX = x * TILE_SIZE;
-                float screenY = y * TILE_SIZE;
-
-                batch.draw(getTerrainSprite(tile.getTerrain()),  screenX, screenY,  TILE_SIZE, TILE_SIZE);
-
-                if(tile.getStructure() != null) {
-                    batch.draw(getStructureSprite(tile.getStructure(), map), screenX, screenY, TILE_SIZE, TILE_SIZE);
-                }
-
-                if(tile.getOverlay() != null) {
-                    batch.draw(getOverlaySprite(tile.getOverlay()), screenX,
-                        screenY, TILE_SIZE, TILE_SIZE);
-                }
+                if (tile == null) continue;
+                float sx = x * TILE_SIZE, sy = y * TILE_SIZE;
+                draw(getTerrainTexture(tile.getTerrain()), sx, sy);
+                if (tile.getStructure() != null)
+                    draw(getStructureTexture(tile.getStructure(), map), sx, sy);
+                if (tile.getOverlay() != null)
+                    draw(getOverlayTexture(tile.getOverlay()), sx, sy);
             }
         }
     }
 
-    private TextureRegion getStructureSprite(Structure structure, Map map) {
+    private TextureRegion getTerrainTexture(Terrain terrain) {
+        if (terrain == null) return texGrass;
+        int f = terrain.getForestLevel();
+        if (f > 0) return texForest[Math.min(f - 1, 3)];
+        return switch (terrain.getType()) {
+            case SLOPE_NORTH -> texSlopeN;
+            case SLOPE_SOUTH -> texSlopeS;
+            case SLOPE_EAST  -> texSlopeE;
+            case SLOPE_WEST  -> texSlopeW;
+            default          -> texGrass;
+        };
+    }
+
+    private TextureRegion getStructureTexture(Structure structure, Map map) {
         if (structure instanceof Road road) return getRoadSprite(road, map);
-        if (structure instanceof City) return tiles[2][0];
-        if (structure instanceof Facility) return tiles[3][4];
-        if (structure instanceof Garage) return tiles[3][9];
-        return tiles[2][0];
+        if (structure instanceof City)     return texCityTile;
+        if (structure instanceof Facility) return texFacilityTile;
+//        if (structure instanceof Garage) return garageSprite;
+        return fallbackTiles[7][3];
     }
 
-    private TextureRegion getOverlaySprite(Overlay overlay) {
-        return tiles[0][0]; // placeholder
-    }
-
-    private void renderVehicles(List<Vehicle> vehicles) {
-        for (Vehicle vehicle : vehicles) {
-            VehiclePosition pos = vehicle.getPosition();
-            if (pos == null) continue;
-
-            // Interpolate between origin and destination
-            float screenX = lerp(pos.getOrigin().x * TILE_SIZE,
-                pos.getDestination().x * TILE_SIZE,
-                pos.getProgress());
-            float screenY = lerp(pos.getOrigin().y * TILE_SIZE,
-                pos.getDestination().y * TILE_SIZE,
-                pos.getProgress());
-
-            batch.draw(getVehicleSprite(vehicle),
-                screenX, screenY, TILE_SIZE, TILE_SIZE);
-        }
-    }
-
-    private float lerp(float a, float b, float t) {
-        return a + (b - a) * t;
+    private TextureRegion getOverlayTexture(Overlay overlay) {
+        if (overlay instanceof StopOverlay) return texStop;
+        return fallbackTiles[0][0];
     }
 
     private TextureRegion getRoadSprite(Road road, Map map) {
-        List<Direction> connections = road.getConnections(map);
-        boolean n = connections.contains(Direction.N);
-        boolean e = connections.contains(Direction.E);
-        boolean s = connections.contains(Direction.S);
-        boolean w = connections.contains(Direction.W);
-
-        int key = (n ? 8 : 0) | (e ? 4 : 0) | (s ? 2 : 0) | (w ? 1 : 0);
-
+        List<Direction> c = road.getConnections(map);
+        int key = 0;
+        if (c.contains(Direction.N)) key |= 8;
+        if (c.contains(Direction.E)) key |= 4;
+        if (c.contains(Direction.S)) key |= 2;
+        if (c.contains(Direction.W)) key |= 1;
         return roadSprites[key];
     }
 
-    private TextureRegion getVehicleSprite(Vehicle vehicle) {
-        switch (vehicle.getType()) {
-            case TRUCK: return tiles[12][12]; // green truck
-            case BUS: return tiles[13][12];   // yellow bus
-            default: return tiles[10][12];
+    private void renderVehicles(List<Vehicle> vehicles) {
+        for (Vehicle v : vehicles) {
+            VehiclePosition pos = v.getPosition();
+            if (pos == null) continue;
+            float sx = lerp(pos.getOrigin().x      * TILE_SIZE,
+                pos.getDestination().x * TILE_SIZE, pos.getProgress());
+            float sy = lerp(pos.getOrigin().y      * TILE_SIZE,
+                pos.getDestination().y * TILE_SIZE, pos.getProgress());
+            draw(getVehicleSprite(v), sx, sy);
         }
+    }
+
+    private TextureRegion getVehicleSprite(Vehicle v) {
+        int idx = getMovementDirection(v.getPosition()).ordinal();
+        return switch (v.getType()) {
+            case TRUCK -> truckSprites[idx];
+            case BUS   -> busSprites[idx];
+            default    -> fallbackTiles[9][8];
+        };
+    }
+
+    private Direction getMovementDirection(VehiclePosition pos) {
+        if (pos == null) return Direction.N;
+        int dx = pos.getDestination().x - pos.getOrigin().x;
+        int dy = pos.getDestination().y - pos.getOrigin().y;
+        if (dx > 0) return Direction.E;
+        if (dx < 0) return Direction.W;
+        if (dy > 0) return Direction.N;
+        return Direction.S;
+    }
+
+    private void draw(TextureRegion r, float x, float y) {
+        batch.draw(r, x, y, TILE_SIZE, TILE_SIZE);
+    }
+
+    private static float lerp(float a, float b, float t) {
+        return a + (b - a) * t;
+    }
+
+    /**
+     * Loads a PNG from assets as a TextureRegion.
+     * If the file doesn't exist returns the fallback slice — never crashes.
+     */
+    private TextureRegion load(String path, TextureRegion fallback) {
+        if (Gdx.files.internal(path).exists()) {
+            Texture t = new Texture(Gdx.files.internal(path));
+            t.setFilter(Texture.TextureFilter.Nearest, Texture.TextureFilter.Nearest);
+            ownedTextures.add(t);
+            return new TextureRegion(t);
+        }
+        return fallback; // specific slice, NOT the whole sheet
+    }
+
+    public void dispose() {
+        fallbackSheet.dispose();
+        for (Texture t : ownedTextures) t.dispose();
     }
 }

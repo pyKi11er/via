@@ -19,28 +19,11 @@ public class EconomySystem {
     public void tick(GameState state) {
         if (state == null || state.getEconomy() == null || state.getTimeState() == null) return;
 
-        maybeDeductVehicleMaintenance(state);
         processStopDeliveries(state);
 
         if (state.getEconomy().getCapital() < 0) {
             state.setGameOver(true);
         }
-    }
-
-    private void maybeDeductVehicleMaintenance(GameState state) {
-        long tick = state.getTimeState().getTick();
-        int interval = Constants.VEHICLE_MAINTENANCE_INTERVAL_TICKS;
-        if (interval <= 0) return;
-        if (tick % interval != 0) return;
-
-        long total = 0;
-        for (Vehicle v : state.getVehicles()) {
-            if (v == null) continue;
-            long cost = v.getMaintenanceCost();
-            if (cost < 0) continue;
-            total += cost;
-        }
-        if (total > 0) state.getEconomy().deduct(total);
     }
 
     private void processStopDeliveries(GameState state) {

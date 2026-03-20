@@ -16,6 +16,50 @@ public class Constants {
     /** Deduct maintenance once per interval per vehicle. */
     public static final int VEHICLE_MAINTENANCE_INTERVAL_TICKS = 60;
 
+    /**
+     * Vehicle age (in simulation ticks) at which it becomes "over-aged" and can be sold.
+     * When the vehicle is sold, its resale value is returned to capital.
+     */
+    public static final int VEHICLE_MAX_AGE_TICKS = 900;
+
+    /**
+     * Minimum maintenance interval as the vehicle ages.
+     * The maintenance interval decreases with age but will never go below this value.
+     */
+    public static final int VEHICLE_MIN_MAINTENANCE_INTERVAL_TICKS = 15;
+
+    /**
+     * Controls how quickly the maintenance interval decreases with age.
+     * Interval(age) is computed as:
+     * baseInterval / (1 + age/scale), clamped by VEHICLE_MIN_MAINTENANCE_INTERVAL_TICKS.
+     */
+    public static final int VEHICLE_MAINTENANCE_INTERVAL_AGE_SCALE_TICKS = 300;
+
+    /**
+     * Resale value floor as a fraction of purchaseCost (used when the vehicle is over-aged).
+     */
+    public static final double VEHICLE_MIN_RESALE_FRACTION = 0.10;
+
+    /** Returns the maintenance interval in ticks based on current vehicle age. */
+    public static long getMaintenanceIntervalTicks(long ageTicks) {
+        if (ageTicks < 0) ageTicks = 0;
+        double base = VEHICLE_MAINTENANCE_INTERVAL_TICKS;
+        double scale = Math.max(1.0, VEHICLE_MAINTENANCE_INTERVAL_AGE_SCALE_TICKS);
+        long interval = Math.round(base / (1.0 + (ageTicks / scale)));
+        return Math.max(VEHICLE_MIN_MAINTENANCE_INTERVAL_TICKS, interval);
+    }
+
+    /** Computes resale value as a deterministic function of age. */
+    public static long getResaleValue(long purchaseCost, long ageTicks) {
+        if (purchaseCost <= 0) return 0;
+        if (ageTicks < 0) ageTicks = 0;
+
+        // Resale fraction declines linearly with age, but never below VEHICLE_MIN_RESALE_FRACTION.
+        double frac = 1.0 - ((double) ageTicks / (double) VEHICLE_MAX_AGE_TICKS);
+        frac = Math.max(VEHICLE_MIN_RESALE_FRACTION, Math.min(1.0, frac));
+        return Math.round(purchaseCost * frac);
+    }
+
     public static long getBaseIncomePerUnit(GoodType type) {
         if (type == null) return 0L;
         return switch (type) {

@@ -6,6 +6,7 @@ import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.via.model.Constants;
 import com.via.model.GameState;
+import com.via.model.building.Garage;
 import com.via.model.building.City;
 import com.via.model.building.Facility;
 import com.via.model.building.Road;
@@ -103,6 +104,7 @@ public class WorldMapRenderer {
         if (structure instanceof Road road) return getRoadSprite(road, map);
         if (structure instanceof City) return tiles[2][0];
         if (structure instanceof Facility) return tiles[3][4];
+        if (structure instanceof Garage) return tiles[3][9];
         return tiles[2][0];
     }
 

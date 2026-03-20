@@ -38,6 +38,14 @@ public class MapInitializer {
             map.setTile(road, new TileCoord(i, 5));
         }
 
+        // Add a test garage connected to the road network.
+        // Vehicle access should be via the adjacent road tile (6,5) for a garage at (6,6).
+        Tile garageTile = new Tile(new TileCoord(6, 6),
+            new Terrain(TerrainType.FLAT, 0, 0),
+            new com.via.model.building.Garage(new Footprint(new TileCoord(6, 6), 1, 1)),
+            null);
+        map.setTile(garageTile, new TileCoord(6, 6));
+
         // Add a test city block
         for (int x = 10; x < 13; x++) {
             for (int y = 10; y < 13; y++) {
@@ -54,7 +62,11 @@ public class MapInitializer {
         com.via.model.vehicle.VehiclePosition pos = new com.via.model.vehicle.VehiclePosition(
             new TileCoord(5, 5), new TileCoord(6, 5));
         com.via.model.vehicle.Vehicle truck = new com.via.model.vehicle.SmallTruck(pos);
+        truck.onPurchased(state.getTimeState().getTick());
         state.addVehicle(truck);
+
+        // Register the garage building in the game state (used for nearest-garage maintenance reroutes).
+            state.addBuilding(new com.via.model.building.Garage(new Footprint(new TileCoord(6, 6), 1, 1)));
 
         // Facility logic (from original createNewGame)
         //Mine

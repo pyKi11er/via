@@ -1,6 +1,7 @@
 package com.via.controller;
 
 import com.via.model.GameState;
+import com.via.model.building.Garage;
 import com.via.model.building.Road;
 import com.via.model.building.StopOverlay;
 import com.via.model.economy.PlayerEconomy;
@@ -34,6 +35,9 @@ public class VehicleMovementSystem {
     // temporary cache for per-vehicle planned paths (tile-by-tile)
     private final java.util.Map<UUID, Queue<TileCoord>> pathCache = new HashMap<>();
 
+    // Caches the last goal used to build the pathCache entry (so we can invalidate when routes change).
+    private final java.util.Map<UUID, TileCoord> pathCacheGoal = new HashMap<>();
+
     public void tick(GameState state) {
         if (state == null || state.isGameOver()) return;
 
@@ -41,6 +45,8 @@ public class VehicleMovementSystem {
         PlayerEconomy economy = state.getEconomy();
 
         occupancy.clear();
+        pathCache.clear();
+        pathCacheGoal.clear();
 
         // Register current occupancy
         for (Vehicle v : state.getVehicles()) {
@@ -79,13 +85,20 @@ public class VehicleMovementSystem {
             v.advanceToNextStop();
             // Clear cached path because destination changes
             pathCache.remove(v.getId());
+            pathCacheGoal.remove(v.getId());
         }
 
         StopOverlay nextStop = v.getNextStop();
         if (nextStop == null) return;
 
-        Queue<TileCoord> plannedPath = pathCache.computeIfAbsent(v.getId(),
-            id -> findPathBfs(map, pos.getOrigin(), nextStop.getLocation()));
+        TileCoord goal = nextStop.getLocation();
+        Queue<TileCoord> plannedPath = pathCache.get(v.getId());
+        TileCoord cachedGoal = pathCacheGoal.get(v.getId());
+        if (plannedPath == null || goal == null || !goal.equals(cachedGoal)) {
+            plannedPath = findPathBfs(map, pos.getOrigin(), goal);
+            pathCache.put(v.getId(), plannedPath);
+            pathCacheGoal.put(v.getId(), goal);
+        }
 
         if (plannedPath == null || plannedPath.isEmpty()) return;
 
@@ -185,7 +198,7 @@ public class VehicleMovementSystem {
 
     private boolean isRoadTile(Map map, TileCoord c) {
         Tile t = map.getTile(c);
-        return t != null && t.getStructure() instanceof Road;
+        return t != null && (t.getStructure() instanceof Road || t.getStructure() instanceof Garage);
     }
 
 

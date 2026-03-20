@@ -1,7 +1,9 @@
 package com.via.model.vehicle;
 
 import com.via.model.building.StopOverlay;
+import com.via.model.Constants;
 import com.via.model.enums.VehicleType;
+import com.via.model.map.TileCoord;
 
 import java.util.UUID;
 
@@ -17,6 +19,14 @@ public abstract class Vehicle {
     private Route assignedRoute;
     private int routeStopIndex;
     private Cargo cargo;
+
+    private long ageTicks;
+    private long maintenanceDueTick;
+
+    private boolean returningToGarage;
+    private Route routeBeforeGarage;
+    private int routeStopIndexBeforeGarage;
+    private TileCoord maintenanceTargetCoord;
 
     protected Vehicle(
         VehicleType type,
@@ -42,6 +52,14 @@ public abstract class Vehicle {
         this.assignedRoute = null;
         this.routeStopIndex = 0;
         this.cargo = null;
+
+        // Runtime state (set up via onPurchased()).
+        this.ageTicks = 0;
+        this.maintenanceDueTick = 0;
+        this.returningToGarage = false;
+        this.routeBeforeGarage = null;
+        this.routeStopIndexBeforeGarage = 0;
+        this.maintenanceTargetCoord = null;
     }
 
     public UUID getId() {
@@ -112,5 +130,84 @@ public abstract class Vehicle {
     public void advanceToNextStop() {
         if (assignedRoute == null || assignedRoute.size() == 0) return;
         routeStopIndex = Math.floorMod(routeStopIndex + 1, assignedRoute.size());
+    }
+
+    public long getAgeTicks() {
+        return ageTicks;
+    }
+
+    public long getMaintenanceDueTick() {
+        return maintenanceDueTick;
+    }
+
+    public boolean isReturningToGarage() {
+        return returningToGarage;
+    }
+
+    public TileCoord getMaintenanceTargetCoord() {
+        return maintenanceTargetCoord;
+    }
+
+    /**
+     * Initializes age/maintenance schedule at purchase time.
+     * Should be called by {@code VehicleFactory.buy()} and any test/setup code that creates vehicles directly.
+     */
+    public void onPurchased(long purchaseTick) {
+        this.ageTicks = 0;
+        this.maintenanceDueTick = purchaseTick + Constants.getMaintenanceIntervalTicks(0);
+        this.returningToGarage = false;
+        this.routeBeforeGarage = null;
+        this.routeStopIndexBeforeGarage = 0;
+        this.maintenanceTargetCoord = null;
+    }
+
+    /** Increments vehicle age by the number of simulation ticks elapsed. */
+    public void incrementAgeTicks(long deltaTicks) {
+        if (deltaTicks <= 0) return;
+        this.ageTicks += deltaTicks;
+    }
+
+    /** Reschedules the next maintenance due tick based on current age. */
+    public void rescheduleNextMaintenanceDueTick(long currentTick) {
+        this.maintenanceDueTick = currentTick + Constants.getMaintenanceIntervalTicks(ageTicks);
+    }
+
+    /** Returns true once vehicle age reaches the over-aged threshold. */
+    public boolean isOverAged() {
+        return ageTicks >= Constants.VEHICLE_MAX_AGE_TICKS;
+    }
+
+    /** Resale value when the vehicle is sold. */
+    public long getResaleValue() {
+        return Constants.getResaleValue(purchaseCost, ageTicks);
+    }
+
+    /**
+     * Overrides the current route to return the vehicle to a garage service point.
+     * The previous route (and stop index) are restored after the vehicle arrives.
+     */
+    public void enterGarageReturn(Route garageMaintenanceRoute, TileCoord maintenanceTargetCoord) {
+        if (garageMaintenanceRoute == null) throw new IllegalArgumentException("garageMaintenanceRoute must not be null");
+        if (maintenanceTargetCoord == null) throw new IllegalArgumentException("maintenanceTargetCoord must not be null");
+
+        if (!returningToGarage) {
+            this.routeBeforeGarage = this.assignedRoute;
+            this.routeStopIndexBeforeGarage = this.routeStopIndex;
+        }
+
+        this.assignedRoute = garageMaintenanceRoute;
+        this.routeStopIndex = 0;
+        this.returningToGarage = true;
+        this.maintenanceTargetCoord = maintenanceTargetCoord;
+    }
+
+    /** Restores the route overridden by {@link #enterGarageReturn(Route, TileCoord)}. */
+    public void restoreAfterGarageReturn() {
+        this.assignedRoute = this.routeBeforeGarage;
+        this.routeStopIndex = this.routeStopIndexBeforeGarage;
+        this.returningToGarage = false;
+        this.routeBeforeGarage = null;
+        this.maintenanceTargetCoord = null;
+        this.routeStopIndexBeforeGarage = 0;
     }
 }

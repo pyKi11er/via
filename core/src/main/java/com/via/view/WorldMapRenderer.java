@@ -7,10 +7,7 @@ import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.via.model.Constants;
 import com.via.model.GameState;
-import com.via.model.building.City;
-import com.via.model.building.Facility;
-import com.via.model.building.Road;
-import com.via.model.building.StopOverlay;
+import com.via.model.building.*;
 import com.via.model.enums.Direction;
 import com.via.model.enums.VehicleType;
 import com.via.model.map.*;
@@ -114,6 +111,7 @@ public class WorldMapRenderer {
     public void render(GameState state) {
         batch.setProjectionMatrix(camera.combined);
         batch.begin();
+
         renderTiles(state.getMap());
         renderVehicles(state.getVehicles());
         batch.end();
@@ -152,6 +150,7 @@ public class WorldMapRenderer {
         if (structure instanceof Road road) return getRoadSprite(road, map);
         if (structure instanceof City)     return texCityTile;
         if (structure instanceof Facility) return texFacilityTile;
+//        if (structure instanceof Garage) return garageSprite;
         return fallbackTiles[7][3];
     }
 

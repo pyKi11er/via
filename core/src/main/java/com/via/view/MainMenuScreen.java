@@ -288,7 +288,7 @@ public class MainMenuScreen extends InputAdapter implements Screen {
                     }
 
                     float itemH = rDrop.height * 0.8f;
-                    float listY = rDrop.y - itemH; // Start right below the dropdown button
+                    float listY = rDrop.y - itemH; 
 
                     for (int i = 0; i < cachedModes.size(); i++) {
                         com.badlogic.gdx.Graphics.DisplayMode m = cachedModes.get(i);
@@ -550,7 +550,6 @@ public class MainMenuScreen extends InputAdapter implements Screen {
         com.badlogic.gdx.Graphics.DisplayMode currentMode = Gdx.graphics.getDisplayMode();
         com.badlogic.gdx.Graphics.DisplayMode[] modes = Gdx.graphics.getDisplayModes();
 
-        // Filter and sort modes to make cycling predictable (optional but good)
         java.util.List<com.badlogic.gdx.Graphics.DisplayMode> filtered = new java.util.ArrayList<>();
         for(com.badlogic.gdx.Graphics.DisplayMode m : modes) {
             if (m.refreshRate == currentMode.refreshRate) {

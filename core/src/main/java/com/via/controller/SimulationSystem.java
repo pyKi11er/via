@@ -8,15 +8,17 @@ public class SimulationSystem {
     private final ForestSystem forestSystem;
     private final EconomySystem economySystem;
     private final FacilitySystem facilitySystem;
+    private final VehicleMovementSystem vehicleMovementSystem;
 
     public SimulationSystem() {
-        this(new ForestSystem(), new EconomySystem(), new FacilitySystem());
+        this(new ForestSystem(), new EconomySystem(), new FacilitySystem(), new VehicleMovementSystem());
     }
 
-    public SimulationSystem(ForestSystem forestSystem, EconomySystem economySystem,  FacilitySystem facilitySystem) {
+    public SimulationSystem(ForestSystem forestSystem, EconomySystem economySystem,  FacilitySystem facilitySystem,  VehicleMovementSystem vehicleMovementSystem) {
         this.forestSystem = Objects.requireNonNull(forestSystem, "forestSystem must not be null");
         this.economySystem = Objects.requireNonNull(economySystem, "economySystem must not be null");
         this.facilitySystem = Objects.requireNonNull(facilitySystem, "facilitySystem must not be null");
+        this.vehicleMovementSystem = Objects.requireNonNull(vehicleMovementSystem, "vehicleMovementSystem must not be null");
     }
 
     /** Advances one simulation tick. */
@@ -29,6 +31,7 @@ public class SimulationSystem {
         forestSystem.tick(state);
         economySystem.tick(state);
         facilitySystem.tick(state);
+        vehicleMovementSystem.tick(state);
         // Future expansions:
         // - Move vehicles along routes
         // - Process facility production/consumption
@@ -36,3 +39,5 @@ public class SimulationSystem {
         // - Adjust city demand
     }
 }
+
+

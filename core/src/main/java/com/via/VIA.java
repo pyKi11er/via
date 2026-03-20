@@ -14,8 +14,8 @@ public class VIA extends Game {
 
     @Override
     public void create() {
-        GameState gameState = MapInitializer.createNewGame();
-        this.setScreen(new GameScreen(this, gameState));
+        batch = new SpriteBatch();
+        this.setScreen(new MainMenuScreen(this));
     }
 
     @Override

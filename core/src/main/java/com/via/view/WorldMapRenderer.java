@@ -40,7 +40,7 @@ public class WorldMapRenderer {
     // Buildings
     private final TextureRegion texCityTile;
     private final TextureRegion texFacilityTile;
-
+    private final TextureRegion texGarageTile;
     // Overlays
     private final TextureRegion texStop;
 
@@ -68,6 +68,7 @@ public class WorldMapRenderer {
 
         texCityTile     = load("buildings/city_tile.png",     fallbackTiles[2][0]);
         texFacilityTile = load("buildings/facility_tile.png", fallbackTiles[3][4]);
+        texGarageTile = load("buildings/garage_tile.png", fallbackTiles[3][9]);
         texStop         = load("overlays/stop.png",           fallbackTiles[7][4]);
 
         truckSprites[0] = load("vehicles/truck_n.png", fallbackTiles[9][8]);
@@ -100,11 +101,21 @@ public class WorldMapRenderer {
         TextureRegion endW  = load("roads/road_end_w.png",      fallbackTiles[7][3]);
         TextureRegion alone = load("roads/road_alone.png",      fallbackTiles[7][3]);
 
-        roadSprites[0]  = alone; roadSprites[1]  = endW;  roadSprites[2]  = endS;
-        roadSprites[3]  = cSW;   roadSprites[4]  = endE;  roadSprites[5]  = strH;
-        roadSprites[6]  = cSE;   roadSprites[7]  = tS;    roadSprites[8]  = endN;
-        roadSprites[9]  = cNW;   roadSprites[10] = strV;  roadSprites[11] = tW;
-        roadSprites[12] = cNE;   roadSprites[13] = tN;    roadSprites[14] = tE;
+        roadSprites[0]  = alone;
+        roadSprites[2]  = endN;
+        roadSprites[8]  = endS;
+        roadSprites[1]  = endE;
+        roadSprites[4]  = endW;
+        roadSprites[3]  = cSW;
+        roadSprites[5]  = strH;
+        roadSprites[6]  = cSE;
+        roadSprites[7]  = tS;
+        roadSprites[9]  = cNW;
+        roadSprites[10] = strV;
+        roadSprites[11] = tW;
+        roadSprites[12] = cNE;
+        roadSprites[13] = tN;
+        roadSprites[14] = tE;
         roadSprites[15] = cross;
     }
 
@@ -150,7 +161,7 @@ public class WorldMapRenderer {
         if (structure instanceof Road road) return getRoadSprite(road, map);
         if (structure instanceof City)     return texCityTile;
         if (structure instanceof Facility) return texFacilityTile;
-//        if (structure instanceof Garage) return garageSprite;
+        if (structure instanceof Garage) return texGarageTile;
         return fallbackTiles[7][3];
     }
 

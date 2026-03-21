@@ -1,5 +1,6 @@
 package com.via.controller;
 
+import com.via.model.Constants;
 import com.via.model.GameState;
 import com.via.model.building.*;
 import com.via.model.economy.ConsumptionItem;
@@ -28,7 +29,7 @@ public class MapInitializer {
     public static GameState createNewGame() {
 
         // 1. Blank map
-        Map map = new Map(new GridSize(40, 30));
+        Map map = new Map(new GridSize(Constants.MAP_WIDTH, Constants.MAP_HEIGHT));
         for (int x = 0; x < 40; x++) {
             for (int y = 0; y < 30; y++) {
                 Terrain terrain = new Terrain(TerrainType.FLAT, 0, 0);

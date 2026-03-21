@@ -123,6 +123,19 @@ public class WorldMapRenderer {
         batch.setProjectionMatrix(camera.combined);
         batch.begin();
 
+        float camX = camera.position.x - camera.viewportWidth  / 2f;
+        float camY = camera.position.y - camera.viewportHeight / 2f;
+        float camW = camera.viewportWidth;
+        float camH = camera.viewportHeight;
+
+        for (float x = camX - TILE_SIZE; x < camX + camW + TILE_SIZE; x += TILE_SIZE) {
+            for (float y = camY - TILE_SIZE; y < camY + camH + TILE_SIZE; y += TILE_SIZE) {
+                draw(texGrass,
+                    (float)(Math.floor(x / TILE_SIZE) * TILE_SIZE),
+                    (float)(Math.floor(y / TILE_SIZE) * TILE_SIZE));
+            }
+        }
+
         renderTiles(state.getMap());
         renderVehicles(state.getVehicles());
         batch.end();

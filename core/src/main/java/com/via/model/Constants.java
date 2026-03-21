@@ -6,21 +6,21 @@ public class Constants {
     private Constants() {}
 
     public static final int TILE_SIZE = 32;        // pixels per tile
-    public static final int MAP_WIDTH = 40;        // tiles
-    public static final int MAP_HEIGHT = 30;       // tiles
+    public static final int MAP_WIDTH = 80;        // tiles
+    public static final int MAP_HEIGHT = 60;       // tiles
     public static final float NORMAL_TICK_RATE = 1f / 60f; // seconds per tick
     public static final float FAST_MULTIPLIER = 2f;
     public static final float VERY_FAST_MULTIPLIER = 4f;
     public static final long STARTING_CAPITAL = 100_000L;
 
     /** Deduct maintenance once per interval per vehicle. */
-    public static final int VEHICLE_MAINTENANCE_INTERVAL_TICKS = 60;
+    public static final int VEHICLE_MAINTENANCE_INTERVAL_TICKS = 18000; // 1 minute in game
 
     /**
      * Vehicle age (in simulation ticks) at which it becomes "over-aged" and can be sold.
      * When the vehicle is sold, its resale value is returned to capital.
      */
-    public static final int VEHICLE_MAX_AGE_TICKS = 900;
+    public static final int VEHICLE_MAX_AGE_TICKS = 216000; // IRL 1 hour
 
     /**
      * Minimum maintenance interval as the vehicle ages.

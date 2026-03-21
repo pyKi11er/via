@@ -30,8 +30,8 @@ public class MapInitializer {
 
         // 1. Blank map
         Map map = new Map(new GridSize(Constants.MAP_WIDTH, Constants.MAP_HEIGHT));
-        for (int x = 0; x < 40; x++) {
-            for (int y = 0; y < 30; y++) {
+        for (int x = 0; x < Constants.MAP_WIDTH; x++) {
+            for (int y = 0; y < Constants.MAP_HEIGHT; y++) {
                 Terrain terrain = new Terrain(TerrainType.FLAT, 0, 0);
                 map.setTile(new Tile(new TileCoord(x, y), terrain, null, null),
                     new TileCoord(x, y));
@@ -66,24 +66,31 @@ public class MapInitializer {
         Route route = new Route(validStops);
         state.addRoute(route);
 
+        if (cityStop != null && cityStop.getStorage() != null) {
+            cityStop.getStorage().addContents(GoodType.PASSENGERS, 400);
+        }
+
         // 6. Add vehicles
+        long startTick = state.getTimeState().getTick();
         VehiclePosition truckPos = new VehiclePosition(
             new TileCoord(3, ROAD_Y), new TileCoord(4, ROAD_Y));
         SmallTruck truck = new SmallTruck(truckPos);
         truck.assignRoute(route);
+        truck.onPurchased(startTick);
         state.addVehicle(truck);
 
         VehiclePosition busPos = new VehiclePosition(
             new TileCoord(11, ROAD_Y), new TileCoord(12, ROAD_Y));
         MidiBus bus = new MidiBus(busPos);
         bus.assignRoute(route);
+        bus.onPurchased(startTick);
         state.addVehicle(bus);
 
         return state;
     }
 
     private static void buildMine(Map map, GameState state) {
-        ProductionRule  prod = new ProductionRule(List.of(new ProductionItem(GoodType.IRON, 5))); // WAS 10 LOWERED FOR DEMO ECONOMYSYSTEM NOT WORKING PROPERLY
+        ProductionRule  prod = new ProductionRule(List.of(new ProductionItem(GoodType.IRON, 10)));
         ConsumptionRule cons = new ConsumptionRule(List.of());
         Facility mine = new Facility(new Footprint(MINE_ORIGIN, 2, 2), prod, cons);
         stampBuilding(map, mine);
@@ -91,7 +98,7 @@ public class MapInitializer {
     }
 
     private static void buildForestCamp(Map map, GameState state) {
-        ProductionRule  prod = new ProductionRule(List.of(new ProductionItem(GoodType.WOOD, 4))); // WAS 8 LOWERED DUE TO ECONOMYSYSTEM ERROR FOR THE DEMO
+        ProductionRule  prod = new ProductionRule(List.of(new ProductionItem(GoodType.WOOD, 8)));
         ConsumptionRule cons = new ConsumptionRule(List.of());
         Facility forestCamp = new Facility(new Footprint(FOREST_ORIGIN, 2, 2), prod, cons);
         stampBuilding(map, forestCamp);
@@ -112,6 +119,7 @@ public class MapInitializer {
             new CityGate(new TileCoord(CITY_A_ORIGIN.x, CITY_A_ORIGIN.y - 1), Direction.S)
         );
         City city = new City(fp, new PassengerDemand(5.0f), gates);
+        city.generateDefaultInternalRoadNetwork();
         stampBuilding(map, city);
         state.addBuilding(city);
     }

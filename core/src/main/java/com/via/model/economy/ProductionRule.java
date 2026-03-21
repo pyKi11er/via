@@ -6,7 +6,7 @@ import java.util.List;
 public class ProductionRule {
     private final List<ProductionItem> outputs;
     public ProductionRule(List<ProductionItem> outputs) {
-        this.outputs = new ArrayList<>(outputs);
+        this.outputs = outputs == null ? new ArrayList<>() : new ArrayList<>(outputs);
     }
     public List<ProductionItem> getOutputs() {
         return outputs;

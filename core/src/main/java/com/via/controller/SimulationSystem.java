@@ -45,11 +45,11 @@ public class SimulationSystem {
 
         state.getTimeState().incrementTick();
         forestSystem.tick(state);
-        facilitySystem.tick(state);           // 1. produce goods + transfer to stops
-        vehicleMaintenanceSystem.tickBeforeMovement(state); // 2. maintenance checks
-        vehicleMovementSystem.tick(state, timeMultiplier);  // 3. vehicles move + load/unload
-        vehicleMaintenanceSystem.tickAfterMovement(state);  // 4. restore after garage
-        economySystem.tick(state);            // 5. process deliveries + income LAST
+        vehicleMaintenanceSystem.tickBeforeMovement(state);
+        facilitySystem.tick(state);
+        vehicleMovementSystem.tick(state, timeMultiplier, economySystem);
+        vehicleMaintenanceSystem.tickAfterMovement(state);
+        economySystem.tick(state);
     }
 
 

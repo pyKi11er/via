@@ -3,7 +3,6 @@ package com.via.controller;
 import com.via.model.GameState;
 import com.via.model.building.Road;
 import com.via.model.building.StopOverlay;
-import com.via.model.economy.PlayerEconomy;
 import com.via.model.economy.Storage;
 import com.via.model.enums.GoodType;
 import com.via.model.enums.VehicleType;
@@ -22,12 +21,11 @@ public class VehicleMovementSystem {
     private final java.util.Map<TileCoord, Set<Vehicle>> occupancy = new HashMap<>();
     private final java.util.Map<UUID, Queue<TileCoord>>  pathCache = new HashMap<>();
 
-    public void tick(GameState state, float timeMultiplier) {
+    public void tick(GameState state, float timeMultiplier, EconomySystem economySystem) {
         if (state == null || state.isGameOver()) return;
 
         float delta = BASE_DELTA * timeMultiplier;
-        Map map     = state.getMap();
-        PlayerEconomy economy = state.getEconomy();
+        Map map = state.getMap();
 
         occupancy.clear();
 
@@ -40,13 +38,13 @@ public class VehicleMovementSystem {
         for (Vehicle v : state.getVehicles()) {
             VehiclePosition pos = v.getPosition();
             if (pos == null) continue;
-            updateVehicleMovement(state, v, pos, map, economy, delta);
+            updateVehicleMovement(state, v, pos, map, economySystem, delta);
         }
     }
 
     private void updateVehicleMovement(GameState state, Vehicle v,
                                        VehiclePosition pos, Map map,
-                                       PlayerEconomy economy, float delta) {
+                                       EconomySystem economySystem, float delta) {
         float speed       = v.getSpeed();
         double slopeFactor = map.getVehicleSpeedMultiplier(pos.getOrigin(), pos.getDestination());
         float appliedSpeed = (float)(speed * slopeFactor);
@@ -63,7 +61,7 @@ public class VehicleMovementSystem {
 
         StopOverlay currentStop = getStopAtCoord(v, pos.getOrigin());
         if (currentStop != null) {
-            unloadAtStop(v, currentStop, economy);
+            unloadAtStop(state, v, currentStop, economySystem);
             loadFromStop(v, currentStop);
             v.advanceToNextStop();
             pathCache.remove(v.getId()); // destination changed — clear cached path
@@ -97,13 +95,18 @@ public class VehicleMovementSystem {
     // Cargo
     // ══════════════════════════════════════════════════════════════════════════
 
-    private void unloadAtStop(Vehicle v, StopOverlay stop, PlayerEconomy economy) {
+    private void unloadAtStop(GameState state, Vehicle v, StopOverlay stop, EconomySystem economySystem) {
         Cargo cargo = v.getCargo();
         if (cargo == null || cargo.getAmount() <= 0) return;
         Storage storage = stop.getStorage();
         if (storage == null) return;
-        storage.addContents(cargo.getType(), cargo.getAmount());
+        GoodType type = cargo.getType();
+        int amount = cargo.getAmount();
+        storage.addContents(type, amount);
         v.setCargo(null);
+        if (economySystem != null) {
+            economySystem.onVehicleUnloadedCargoAtStop(state, stop, type, amount);
+        }
     }
 
     private void loadFromStop(Vehicle v, StopOverlay stop) {

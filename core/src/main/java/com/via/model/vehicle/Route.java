@@ -45,9 +45,12 @@ public class Route {
         return stops.get((idx + 1) % stops.size());
     }
 
-    /** Circular next stop after a current index. */
-    public StopOverlay getNextStop(int currentIndex) {
+    /**
+     * Stop to drive toward next. {@code routeStopIndex} on the vehicle is the index of that stop
+     * in this list (0-based); {@link com.via.model.vehicle.Vehicle#advanceToNextStop} rotates it.
+     */
+    public StopOverlay getNextStop(int routeStopIndex) {
         if (stops.isEmpty()) return null;
-        return stops.get(Math.floorMod(currentIndex + 1, stops.size()));
+        return stops.get(Math.floorMod(routeStopIndex, stops.size()));
     }
 }

@@ -5,6 +5,7 @@ import com.via.model.building.Garage;
 import com.via.model.building.Road;
 import com.via.model.building.StopAccess;
 import com.via.model.building.StopOverlay;
+import com.via.model.economy.Storage;
 import com.via.model.enums.AccessType;
 import com.via.model.enums.Direction;
 import com.via.model.map.Map;
@@ -51,24 +52,21 @@ public class VehicleMaintenanceSystem {
             if (v.isReturningToGarage()) continue;
             if (currentTick < v.getMaintenanceDueTick()) continue;
 
-            // Pay maintenance and reschedule
             state.getEconomy().deduct(v.getMaintenanceCost());
             v.rescheduleNextMaintenanceDueTick(currentTick);
 
-            // Find the nearest road tile that is adjacent to a garage
             GarageAccess access = findNearestGarageAccessTile(state, v.getPosition().getOrigin());
             if (access == null) continue;
 
-            // The stop is on the ROAD TILE next to the garage — BFS can reach this
             StopOverlay garageStop = new StopOverlay(
                 "Garage",
-                access.accessRoadTile,  // road tile, not garage tile
+                access.accessRoadTile,
                 new StopAccess(
                     AccessType.ROAD_TILE,
                     access.garageTile,
                     computeDirection(access.garageTile, access.accessRoadTile)
                 ),
-                null
+                new Storage()  // fix: never null
             );
 
             Route maintenanceRoute = new Route(List.of(garageStop));

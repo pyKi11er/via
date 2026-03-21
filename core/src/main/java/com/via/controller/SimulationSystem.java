@@ -41,28 +41,18 @@ public class SimulationSystem {
      * move faster at 2x / 4x speed settings.
      */
     public void updateTick(GameState state, float timeMultiplier) {
-        if (state == null) return;
-        if (state.isGameOver()) return;
+        if (state == null || state.isGameOver()) return;
 
-        // Advance simulation time
         state.getTimeState().incrementTick();
         forestSystem.tick(state);
-
-        // Maintenance age progression, garage reroutes, and selling happen before economy + movement.
-        economySystem.tick(state);
-//        vehicleMaintenanceSystem.tickBeforeMovement(state);
-        facilitySystem.tick(state);
-        vehicleMovementSystem.tick(state,timeMultiplier);
-        vehicleMaintenanceSystem.tickAfterMovement(state);
-        // Restore routes after vehicles reach garage service points.
-        // Future expansions:
-        // - Move vehicles along routes
-        // - Process facility production/consumption
-        // - Update economy flows
-        // - Adjust city demand
-        economySystem.tick(state);
-        vehicleMovementSystem.tick(state, timeMultiplier);
+        facilitySystem.tick(state);           // 1. produce goods + transfer to stops
+        vehicleMaintenanceSystem.tickBeforeMovement(state); // 2. maintenance checks
+        vehicleMovementSystem.tick(state, timeMultiplier);  // 3. vehicles move + load/unload
+        vehicleMaintenanceSystem.tickAfterMovement(state);  // 4. restore after garage
+        economySystem.tick(state);            // 5. process deliveries + income LAST
     }
+
+
 }
 
 

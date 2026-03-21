@@ -20,4 +20,8 @@ public abstract class Building implements Structure{
     public List<TileCoord> getOccupiedTiles(){
         return footprint.getTiles();
     }
+
+    public Footprint getFootprint() {
+        return footprint;
+    }
 }

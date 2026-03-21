@@ -14,6 +14,8 @@ import com.via.model.map.Tile;
 import com.via.model.map.TileCoord;
 import com.via.model.vehicle.Vehicle;
 
+import java.util.ArrayList;
+
 public class EconomySystem {
 
     public void tick(GameState state) {
@@ -36,7 +38,6 @@ public class EconomySystem {
                 Tile tile = map.getTile(coord);
                 if (tile == null) continue;
                 if (!(tile.getOverlay() instanceof StopOverlay stop)) continue;
-
                 deliverToAdjacentDemand(state, map, stop);
             }
         }
@@ -59,19 +60,35 @@ public class EconomySystem {
         }
     }
 
+    //----------------------FIX NEEDED generates income when the facility consumes the delivered good.
+    // WOOD is being delivered to the Steel Mill but Steel Mill consumes IRON not WOOD — so no income.
+
+//    private void deliverToFacility(GameState state, Storage storage, Facility facility) {
+//        if (facility.getConsumption() == null) return;
+//
+//        for (ConsumptionItem item : facility.getConsumption().getInputs()) {
+//            if (item == null) continue;
+//            int available = storage.getAmount(item.type);
+//            if (available <= 0) continue;
+//
+//            int deliver = Math.min(available, Math.max(0, item.amount));
+//            if (deliver <= 0) continue;
+//
+//            storage.removeAmount(item.type, deliver);
+//            long income = calculateIncome(item.type, deliver, item.amount);
+//            state.getEconomy().earn(income);
+//        }
+//    }
+
+
+//    --------------QUICK FIX FOR THE DEMO ONLY
     private void deliverToFacility(GameState state, Storage storage, Facility facility) {
-        if (facility.getConsumption() == null) return;
-
-        for (ConsumptionItem item : facility.getConsumption().getInputs()) {
-            if (item == null) continue;
-            int available = storage.getAmount(item.type);
+        // Generate income for any goods delivered regardless of consumption rules
+        for (GoodType type : new ArrayList<>(storage.getContents().keySet())) {
+            int available = storage.getAmount(type);
             if (available <= 0) continue;
-
-            int deliver = Math.min(available, Math.max(0, item.amount));
-            if (deliver <= 0) continue;
-
-            storage.removeAmount(item.type, deliver);
-            long income = calculateIncome(item.type, deliver, item.amount);
+            storage.removeAmount(type, available);
+            long income = calculateIncome(type, available, 10);
             state.getEconomy().earn(income);
         }
     }

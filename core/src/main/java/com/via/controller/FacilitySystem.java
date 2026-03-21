@@ -1,16 +1,18 @@
 package com.via.controller;
 
 import com.via.model.GameState;
-import com.via.model.building.Building;
-import com.via.model.building.City;
-import com.via.model.building.Facility;
-import com.via.model.building.PassengerDemand;
+import com.via.model.building.*;
 import com.via.model.economy.*;
+import com.via.model.enums.GoodType;
+import com.via.model.map.Map;
+import com.via.model.map.Tile;
+import com.via.model.map.TileCoord;
 
+import java.util.ArrayList;
 import java.util.Random;
 
 public class FacilitySystem {
-    private static final int PRODUCTION_INTERVAL_TICKS = 30;
+    private static final int PRODUCTION_INTERVAL_TICKS = 120; // was 30, now 2x slower for the demo
     private static final float MAX_DEMAND_CHANGE_PER_DAY = 0.05f;
     private static final int TICKS_PER_DAY = 240;
 
@@ -19,14 +21,14 @@ public class FacilitySystem {
             return;
         }
         long tick = state.getTimeState().getTick();
-        for(Building building : state.getBuildings()){
-            if(building instanceof Facility facility){
+        for(Building building : state.getBuildings()) {
+            if (building instanceof Facility facility) {
                 processFacility(facility, tick);
-            }
-            else if(building instanceof City city){
+            } else if (building instanceof City city) {
                 fluctuateDemand(city, tick);
             }
         }
+        transferToAdjacentStops(state);
     }
 
     private void processFacility(Facility facility, long tick) {
@@ -67,4 +69,37 @@ public class FacilitySystem {
         float newRate = Math.max(0.1f, current + change);
         demand.setRatePerTick(newRate);
     }
+    private void transferToAdjacentStops(GameState state) {
+        Map map = state.getMap();
+        for (Building building : state.getBuildings()) {
+            if (!(building instanceof Facility facility)) continue;
+            Storage facilityStorage = facility.getStorage();
+
+            for (TileCoord coord : facility.getOccupiedTiles()) {
+
+                for (TileCoord adj : map.getAdjacentCoords(coord)) {
+                    Tile tile = map.getTile(adj);
+
+                }
+            }
+            // Check all tiles adjacent to facility footprint
+            for (TileCoord coord : facility.getOccupiedTiles()) {
+                for (TileCoord adj : map.getAdjacentCoords(coord)) {
+                    Tile tile = map.getTile(adj);
+                    if (tile == null || !(tile.getOverlay() instanceof StopOverlay stop)) continue;
+                    if (stop.getStorage() == null) continue;
+
+                    // Transfer all available goods to stop
+                    for (GoodType type : new ArrayList<>(facilityStorage.getContents().keySet())) {
+                        int amount = facilityStorage.getAmount(type);
+                        if (amount <= 0) continue;
+                        facilityStorage.removeAmount(type, amount);
+                        stop.getStorage().addContents(type, amount);
+                    }
+                }
+            }
+        }
+
+    }
+
 }

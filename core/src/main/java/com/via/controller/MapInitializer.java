@@ -21,7 +21,7 @@ public class MapInitializer {
     private static final TileCoord MINE_ORIGIN       = new TileCoord(2,  20);
     private static final TileCoord FOREST_ORIGIN     = new TileCoord(10, 20);
     private static final TileCoord STEEL_MILL_ORIGIN = new TileCoord(18, 20);
-    private static final TileCoord CITY_A_ORIGIN     = new TileCoord(28, 18);
+    private static final TileCoord CITY_A_ORIGIN = new TileCoord(28, 19);
     private static final TileCoord GARAGE_ORIGIN     = new TileCoord(6,  16);
 
     private static final int ROAD_Y = 17;
@@ -83,7 +83,7 @@ public class MapInitializer {
     }
 
     private static void buildMine(Map map, GameState state) {
-        ProductionRule  prod = new ProductionRule(List.of(new ProductionItem(GoodType.IRON, 10)));
+        ProductionRule  prod = new ProductionRule(List.of(new ProductionItem(GoodType.IRON, 5))); // WAS 10 LOWERED FOR DEMO ECONOMYSYSTEM NOT WORKING PROPERLY
         ConsumptionRule cons = new ConsumptionRule(List.of());
         Facility mine = new Facility(new Footprint(MINE_ORIGIN, 2, 2), prod, cons);
         stampBuilding(map, mine);
@@ -91,7 +91,7 @@ public class MapInitializer {
     }
 
     private static void buildForestCamp(Map map, GameState state) {
-        ProductionRule  prod = new ProductionRule(List.of(new ProductionItem(GoodType.WOOD, 8)));
+        ProductionRule  prod = new ProductionRule(List.of(new ProductionItem(GoodType.WOOD, 4))); // WAS 8 LOWERED DUE TO ECONOMYSYSTEM ERROR FOR THE DEMO
         ConsumptionRule cons = new ConsumptionRule(List.of());
         Facility forestCamp = new Facility(new Footprint(FOREST_ORIGIN, 2, 2), prod, cons);
         stampBuilding(map, forestCamp);

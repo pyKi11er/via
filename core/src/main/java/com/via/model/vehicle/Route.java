@@ -46,11 +46,10 @@ public class Route {
     }
 
     /**
-     * Stop to drive toward next. {@code routeStopIndex} on the vehicle is the index of that stop
-     * in this list (0-based); {@link com.via.model.vehicle.Vehicle#advanceToNextStop} rotates it.
+     * Next leg destination: {@code routeStopIndex} is the cursor for the upcoming stop (wrapped).
+     * After {@code assignRoute}, use 0 to target the first stop in the list.
      */
     public StopOverlay getNextStop(int routeStopIndex) {
-        if (stops.isEmpty()) return null;
-        return stops.get(Math.floorMod(routeStopIndex, stops.size()));
+        return getStop(routeStopIndex);
     }
 }

@@ -1,5 +1,7 @@
 package com.via.model.building;
 
+import com.via.model.map.TileCoord;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -24,6 +26,16 @@ public class City extends Building {
         this.internalRoads = new InternalRoadNetwork();
         this.gates = new ArrayList<>(gates);
         gates.forEach(internalRoads::addEntryPoint);
+        initializeInternalRoadNetwork();
+    }
+
+    /** Logical grid over the city footprint for future pathing / UI (map tiles remain City structure). */
+    private void initializeInternalRoadNetwork() {
+        for (TileCoord c : getOccupiedTiles()) {
+            if (!internalRoads.isInternalRoad(c)) {
+                internalRoads.addRoadTile(c);
+            }
+        }
     }
     public PassengerDemand getPassengerDemand() {
         return passengerDemand;

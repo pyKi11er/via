@@ -17,8 +17,13 @@ import com.badlogic.gdx.utils.ScreenUtils;
 import com.via.VIA;
 import com.via.controller.GameEngine;
 import com.via.controller.RoadBuilder;
+import com.via.controller.StopBuilder;
 import com.via.model.Constants;
 import com.via.model.GameState;
+import com.via.model.building.StopAccess;
+import com.via.model.economy.Storage;
+import com.via.model.enums.AccessType;
+import com.via.model.enums.Direction;
 import com.via.model.enums.SpeedSetting;
 import com.via.model.map.Tile;
 import com.via.model.map.TileCoord;
@@ -29,6 +34,9 @@ public class GameScreen implements Screen {
     private final GameState gameState;
     private final GameEngine gameEngine;
     private final RoadBuilder roadBuilder;
+    private final StopBuilder stopBuilder;
+    /** Increments for player-placed stop names ("Stop 1", …). */
+    private int playerStopSequence = 1;
 
     // two cameras: one follows the map, one is fixed for HUD
     private final OrthographicCamera mapCamera;
@@ -87,6 +95,7 @@ public class GameScreen implements Screen {
         this.gameState = gameState;
         this.gameEngine = new GameEngine(gameState);
         this.roadBuilder = new RoadBuilder(gameState.getMap(), gameState.getEconomy(), 100, 50);
+        this.stopBuilder = new StopBuilder(gameState.getMap(), gameState.getEconomy(), Constants.STOP_PLACEMENT_COST);
 
         mapCamera = new OrthographicCamera();
         mapCamera.setToOrtho(false, Gdx.graphics.getWidth(), Gdx.graphics.getHeight());
@@ -213,7 +222,11 @@ public class GameScreen implements Screen {
         Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
 
         Tile tile = gameState.getMap().getTile(hoveredTile);
-        boolean canPlace = tile != null && tile.isEmpty();
+        boolean canPlace = switch (activeBuildOption) {
+            case 0 -> tile != null && tile.isEmpty();
+            case 1 -> stopBuilder.canPlaceStopAt(hoveredTile);
+            default -> false;
+        };
 
         // green = can build here, red = blocked
         sr.begin(ShapeRenderer.ShapeType.Filled);
@@ -290,7 +303,24 @@ public class GameScreen implements Screen {
             return;
         }
 
-        if (activeBuildOption == 1) { showFeedback("Stop placement coming soon.", Color.YELLOW); return; }
+        if (activeBuildOption == 1) {
+            if (gameState.getEconomy().getCapital() < Constants.STOP_PLACEMENT_COST) {
+                showFeedback("Not enough money (need $" + Constants.STOP_PLACEMENT_COST + ").", Color.RED);
+                return;
+            }
+            if (!stopBuilder.canPlaceStopAt(coord)) {
+                showFeedback("Place on an empty road tile with another road beside it.", Color.RED);
+                return;
+            }
+            StopAccess access = new StopAccess(AccessType.ROAD_TILE, coord, Direction.N);
+            String name = "Stop " + playerStopSequence++;
+            if (stopBuilder.placeStop(name, coord, access, new Storage())) {
+                showFeedback("Stop built: " + name, Color.GREEN);
+            } else {
+                showFeedback("Could not place stop.", Color.RED);
+            }
+            return;
+        }
         if (activeBuildOption == 2) { showFeedback("Garage placement coming soon.", Color.YELLOW); return; }
         if (activeBuildOption == 3) { showFeedback("Terraform coming soon.", Color.YELLOW); return; }
 
@@ -344,7 +374,14 @@ public class GameScreen implements Screen {
 
         // show active build mode name in the centre
         if (activeBuildOption >= 0) {
-            String modeLabel = "Mode: " + buildLabels[activeBuildOption] + "  [cost: $100]";
+            int modeCost = switch (activeBuildOption) {
+                case 0 -> 100;
+                case 1 -> Constants.STOP_PLACEMENT_COST;
+                default -> 0;
+            };
+            String modeLabel = modeCost > 0
+                ? "Mode: " + buildLabels[activeBuildOption] + "  [cost: $" + modeCost + "]"
+                : "Mode: " + buildLabels[activeBuildOption];
             gl.setText(font, modeLabel);
             batch.begin();
             font.setColor(1.0f, 0.85f, 0.20f, 1f);

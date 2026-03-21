@@ -26,6 +26,9 @@ public class FacilitySystem {
                 processFacility(facility, tick);
             } else if (building instanceof City city) {
                 fluctuateDemand(city, tick);
+                if (tick % TICKS_PER_DAY == 0) {
+                    replenishPassengersAtCityStops(state, city);
+                }
             }
         }
         transferToAdjacentStops(state);
@@ -69,19 +72,30 @@ public class FacilitySystem {
         float newRate = Math.max(0.1f, current + change);
         demand.setRatePerTick(newRate);
     }
+
+    /** Adds passengers to a stop adjacent to the city (no income — only restocks pickup points). */
+    private void replenishPassengersAtCityStops(GameState state, City city) {
+        PassengerDemand demand = city.getPassengerDemand();
+        if (demand == null) return;
+        Map map = state.getMap();
+        if (map == null) return;
+        int batch = Math.max(4, (int) Math.ceil(demand.getRatePerTick() * 8f));
+        for (TileCoord c : city.getOccupiedTiles()) {
+            for (TileCoord adj : map.getAdjacentCoords(c)) {
+                Tile tile = map.getTile(adj);
+                if (tile == null || !(tile.getOverlay() instanceof StopOverlay stop)) continue;
+                if (stop.getStorage() == null) continue;
+                stop.getStorage().addContents(GoodType.PASSENGERS, batch);
+                return;
+            }
+        }
+    }
     private void transferToAdjacentStops(GameState state) {
         Map map = state.getMap();
         for (Building building : state.getBuildings()) {
             if (!(building instanceof Facility facility)) continue;
             Storage facilityStorage = facility.getStorage();
 
-            for (TileCoord coord : facility.getOccupiedTiles()) {
-
-                for (TileCoord adj : map.getAdjacentCoords(coord)) {
-                    Tile tile = map.getTile(adj);
-
-                }
-            }
             // Check all tiles adjacent to facility footprint
             for (TileCoord coord : facility.getOccupiedTiles()) {
                 for (TileCoord adj : map.getAdjacentCoords(coord)) {

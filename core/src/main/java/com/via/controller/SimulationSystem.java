@@ -50,7 +50,7 @@ public class SimulationSystem {
 
         // Maintenance age progression, garage reroutes, and selling happen before economy + movement.
         economySystem.tick(state);
-        vehicleMaintenanceSystem.tickBeforeMovement(state);
+//        vehicleMaintenanceSystem.tickBeforeMovement(state);
         facilitySystem.tick(state);
         vehicleMovementSystem.tick(state,timeMultiplier);
         vehicleMaintenanceSystem.tickAfterMovement(state);

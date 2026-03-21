@@ -30,9 +30,14 @@ public class VehicleFactory {
 
         VehiclePosition pos = new VehiclePosition(origin, destination);
         Vehicle v = switch (type) {
-            case TRUCK -> new SmallTruck(pos);
-            case BUS -> new MidiBus(pos);
+            case TRUCK        -> new SmallTruck(pos);
+            case BUS          -> new MidiBus(pos);
+            case MINI_TRUCK   -> new MiniTruck(pos);
+            case HEAVY_TRUCK  -> new HeavyTruck(pos);
+            case EXPRESS_BUS  -> new ExpressBus(pos);
+            case CITY_BUS     -> new CityBus(pos);
         };
+
 
         // Charge purchase cost.
         state.getEconomy().deduct(v.getPurchaseCost());

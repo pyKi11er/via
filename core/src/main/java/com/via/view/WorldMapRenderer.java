@@ -162,9 +162,9 @@ public class WorldMapRenderer {
     private TextureRegion getRoadSprite(Road road, Map map) {
         List<Direction> c = road.getConnections(map);
         int key = 0;
-        if (c.contains(Direction.N)) key |= 2; // N in tiles = visually down = sprite S
+        if (c.contains(Direction.N)) key |= 2;
         if (c.contains(Direction.E)) key |= 4;
-        if (c.contains(Direction.S)) key |= 8; // S in tiles = visually up = sprite N
+        if (c.contains(Direction.S)) key |= 8;
         if (c.contains(Direction.W)) key |= 1;
         return roadSprites[key];
     }
@@ -196,7 +196,7 @@ public class WorldMapRenderer {
         int dy = pos.getDestination().y - pos.getOrigin().y;
         if (dx > 0) return Direction.E;
         if (dx < 0) return Direction.W;
-        if (dy > 0) return Direction.S; // swapped — higher Y = visually up but S sprite
+        if (dy > 0) return Direction.S;
         return Direction.N;
     }
 

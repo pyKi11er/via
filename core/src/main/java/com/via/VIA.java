@@ -30,8 +30,7 @@ public class VIA extends Game {
     }
 
     public void showMainMenu() {
-        // setScreen(new MainMenuScreen(this));
-        // For now just exit cleanly:
-        Gdx.app.exit();
+        this.setScreen(new MainMenuScreen(this));
+//        Gdx.app.exit();
     }
 }

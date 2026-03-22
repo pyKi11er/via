@@ -600,7 +600,12 @@ public class GameScreen implements Screen {
 
         float popupX = (isBuyTab || isRoutesTab || isVehiclesTab) ? 8f : tabBtns[activeTab].x;
         float popupW = (isBuyTab || isRoutesTab || isVehiclesTab) ? 720f : 600f;
-        float popupH = isBuyTab ? 290f : (isRoutesTab || isVehiclesTab) ? 320f : 60f;
+        int vehicleCount = isVehiclesTab ? gameState.getVehicles().size() : 0;
+        int stopCount = isRoutesTab ? countMapStops() : 0;
+        float popupH = isBuyTab ? 290f
+                : isRoutesTab ? Math.min(420f, 62f + Math.max(1, stopCount) * 36f + 54f)
+                : isVehiclesTab ? Math.min(400f, 62f + Math.max(1, vehicleCount) * 38f + 16f)
+                : 60f;
 
         rPopup = new Rectangle(popupX, BOT_BAR_H + 5f, popupW, popupH);
         rPopupClose = new Rectangle(
@@ -719,95 +724,148 @@ public class GameScreen implements Screen {
 
         // Routes tab — create routes from placed stops
         if (activeTab == 1) {
-            // Collect all stops from the map
-            List<StopOverlay> allStops = new ArrayList<>();
-            for (int x = 0; x < gameState.getMap().size.width; x++) {
-                for (int y = 0; y < gameState.getMap().size.height; y++) {
-                    Tile tile = gameState.getMap().getTile(new TileCoord(x, y));
-                    if (tile != null && tile.getOverlay() instanceof StopOverlay stop) {
-                        allStops.add(stop);
-                    }
-                }
-            }
+            List<StopOverlay> allStops = collectMapStops();
 
+            long selectedCount = selectedStops.stream().filter(b -> b).count();
+
+            // header
             font.getData().setScale(1.0f);
             batch.begin();
-            font.setColor(Color.WHITE);
-            font.draw(batch, "Create Route - Select Stops:", rPopup.x + 12f, rPopup.y + rPopup.height - 20f);
+            font.setColor(new Color(0.70f, 0.80f, 1.0f, 1f));
+            font.draw(batch, "Create Route", rPopup.x + 12f, rPopup.y + rPopup.height - 36f);
+            font.setColor(new Color(0.50f, 0.55f, 0.65f, 1f));
+            String selHint = selectedCount == 0 ? "select stops below"
+                           : selectedCount == 1 ? "1 stop selected — pick at least 2"
+                           : selectedCount + " stops selected";
+            font.draw(batch, "—  " + selHint, rPopup.x + 120f, rPopup.y + rPopup.height - 36f);
             batch.end();
 
-            // Ensure selectedStops list matches number of stops
+            // sync selectedStops size
             while (selectedStops.size() < allStops.size()) selectedStops.add(false);
             while (selectedStops.size() > allStops.size()) selectedStops.remove(selectedStops.size() - 1);
 
             stopCheckboxes.clear();
-            float checkY = rPopup.y + rPopup.height - 48f;
-            for (int i = 0; i < allStops.size(); i++) {
-                StopOverlay stop = allStops.get(i);
-                Rectangle checkBox = new Rectangle(rPopup.x + 12f, checkY - i * 28f, 18f, 18f);
-                stopCheckboxes.add(checkBox);
+            float rowH = 32f;
+            float curY = rPopup.y + rPopup.height - 58f;
 
-                // Draw checkbox
+            for (int i = 0; i < allStops.size(); i++) {
+                curY -= rowH;
+                boolean selected = selectedStops.get(i);
+
+                // row background
                 sr.begin(ShapeRenderer.ShapeType.Filled);
-                sr.setColor(0.18f, 0.22f, 0.32f, 1f);
-                sr.rect(checkBox.x, checkBox.y, checkBox.width, checkBox.height);
-                if (selectedStops.get(i)) {
-                    sr.setColor(0.20f, 0.70f, 0.30f, 1f);
-                    sr.rect(checkBox.x + 3f, checkBox.y + 3f, checkBox.width - 6f, checkBox.height - 6f);
-                }
+                sr.setColor(selected
+                    ? new Color(0.12f, 0.22f, 0.38f, 1f)
+                    : i % 2 == 0 ? new Color(0.10f, 0.14f, 0.22f, 1f) : new Color(0.13f, 0.17f, 0.27f, 1f));
+                sr.rect(rPopup.x + 8f, curY, rPopup.width - 32f, rowH);
+                // left accent bar
+                sr.setColor(selected ? new Color(0.20f, 0.60f, 0.95f, 1f) : new Color(0.25f, 0.30f, 0.42f, 1f));
+                sr.rect(rPopup.x + 8f, curY, 4f, rowH);
+                sr.end();
+
+                // checkbox indicator
+                sr.begin(ShapeRenderer.ShapeType.Filled);
+                sr.setColor(selected ? new Color(0.20f, 0.70f, 0.35f, 1f) : new Color(0.20f, 0.24f, 0.34f, 1f));
+                sr.rect(rPopup.x + 18f, curY + rowH / 2f - 7f, 14f, 14f);
                 sr.end();
 
                 batch.begin();
-                font.setColor(Color.WHITE);
-                font.draw(batch, stop.getName(), checkBox.x + 24f, checkBox.y + 14f);
+                font.setColor(selected ? Color.WHITE : new Color(0.75f, 0.78f, 0.85f, 1f));
+                font.draw(batch, allStops.get(i).getName(), rPopup.x + 40f, curY + rowH / 2f + 7f);
+                if (selected) {
+                    font.setColor(new Color(0.40f, 0.80f, 0.95f, 1f));
+                    font.draw(batch, "✓", rPopup.x + rPopup.width - 50f, curY + rowH / 2f + 7f);
+                }
+                batch.end();
+
+                stopCheckboxes.add(new Rectangle(rPopup.x + 8f, curY, rPopup.width - 32f, rowH));
+            }
+
+            if (allStops.isEmpty()) {
+                batch.begin();
+                font.setColor(new Color(0.50f, 0.55f, 0.65f, 1f));
+                font.draw(batch, "No stops placed yet. Use the Build tab.", rPopup.x + 18f, curY - 8f);
                 batch.end();
             }
 
             // Create Route button
-            long selectedCount = selectedStops.stream().filter(b -> b).count();
-            rBtnCreateRoute = new Rectangle(rPopup.x + rPopup.width - 134f, rPopup.y + 8f, 120f, 38f);
-            Color createBtnColor = selectedCount >= 2
-                ? new Color(0.20f, 0.47f, 0.80f, 1f)
-                : new Color(0.35f, 0.38f, 0.48f, 1f);
-            drawBtn(rBtnCreateRoute, "Create Route", createBtnColor);
+            rBtnCreateRoute = new Rectangle(rPopup.x + rPopup.width - 144f, rPopup.y + 8f, 130f, 38f);
+            drawBtn(rBtnCreateRoute, "Create Route  (" + selectedCount + ")",
+                selectedCount >= 2 ? new Color(0.20f, 0.47f, 0.80f, 1f) : new Color(0.28f, 0.30f, 0.40f, 1f));
 
             font.getData().setScale(1.4f);
         }
 
-        // Vehicles tab — assign routes to vehicles
+        // Vehicles tab — list with route assignment
         if (activeTab == 3) {
             List<Vehicle> vehicles = gameState.getVehicles();
-            List<Route> routes = gameState.getRoutes();
 
+            // header
             font.getData().setScale(1.0f);
             batch.begin();
-            font.setColor(Color.WHITE);
-            font.draw(batch, "Vehicles - Click to Assign Route:", rPopup.x + 12f, rPopup.y + rPopup.height - 20f);
+            font.setColor(new Color(0.70f, 0.80f, 1.0f, 1f));
+            font.draw(batch, "Vehicles", rPopup.x + 12f, rPopup.y + rPopup.height - 36f);
+            font.setColor(new Color(0.50f, 0.55f, 0.65f, 1f));
+            font.draw(batch, vehicles.size() + " total  —  click a row to assign route",
+                rPopup.x + 90f, rPopup.y + rPopup.height - 36f);
             batch.end();
 
             vehicleAssignBtns.clear();
-            float vehY = rPopup.y + rPopup.height - 52f;
+            float rowH = 34f;
+            float curY = rPopup.y + rPopup.height - 58f;
+
             for (int i = 0; i < vehicles.size(); i++) {
                 Vehicle v = vehicles.get(i);
-                String vehName = v.getType().toString() + " #" + (i + 1);
-                String routeInfo = v.getAssignedRoute() != null
-                    ? " (Route: " + v.getAssignedRoute().size() + " stops)"
-                    : " (No route)";
+                curY -= rowH;
+                float rowY = curY;
 
-                Rectangle vehBtn = new Rectangle(rPopup.x + 12f, vehY - i * 44f, rPopup.width - 38f, 38f);
-                vehicleAssignBtns.add(vehBtn);
+                // row background
+                sr.begin(ShapeRenderer.ShapeType.Filled);
+                sr.setColor(i % 2 == 0
+                    ? new Color(0.10f, 0.14f, 0.22f, 1f)
+                    : new Color(0.13f, 0.17f, 0.27f, 1f));
+                sr.rect(rPopup.x + 8f, rowY, rPopup.width - 32f, rowH);
+                sr.end();
 
-                Color vehColor = v.getAssignedRoute() != null
-                    ? new Color(0.20f, 0.60f, 0.30f, 1f)
-                    : new Color(0.60f, 0.30f, 0.20f, 1f);
-                drawBtn(vehBtn, vehName + routeInfo, vehColor);
+                // left color bar (green = has route, orange = no route)
+                boolean hasRoute = v.getAssignedRoute() != null;
+                sr.begin(ShapeRenderer.ShapeType.Filled);
+                sr.setColor(hasRoute ? new Color(0.20f, 0.65f, 0.30f, 1f) : new Color(0.75f, 0.40f, 0.15f, 1f));
+                sr.rect(rPopup.x + 8f, rowY, 4f, rowH);
+                sr.end();
+
+                // vehicle name
+                String displayName = GameController.VEHICLE_CATALOG.stream()
+                    .filter(e -> e.type() == v.getType())
+                    .map(GameController.VehicleCatalogEntry::displayName)
+                    .findFirst().orElse(v.getType().toString());
+                String routeInfo = hasRoute
+                    ? v.getAssignedRoute().size() + " stops"
+                    : "No route";
+
+                batch.begin();
+                font.setColor(Color.WHITE);
+                font.draw(batch, "#" + (i + 1) + "  " + displayName, rPopup.x + 18f, rowY + rowH / 2f + 7f);
+                font.setColor(hasRoute ? new Color(0.50f, 0.90f, 0.55f, 1f) : new Color(0.90f, 0.55f, 0.30f, 1f));
+                font.draw(batch, routeInfo, rPopup.x + 340f, rowY + rowH / 2f + 7f);
+                batch.end();
+
+                Rectangle row = new Rectangle(rPopup.x + 8f, rowY, rPopup.width - 32f, rowH);
+                vehicleAssignBtns.add(row);
+            }
+
+            if (vehicles.isEmpty()) {
+                batch.begin();
+                font.setColor(new Color(0.50f, 0.55f, 0.65f, 1f));
+                font.draw(batch, "No vehicles yet. Buy one from the Buy tab.", rPopup.x + 18f, curY - 8f);
+                batch.end();
             }
 
             font.getData().setScale(1.4f);
         }
 
         // input handling — skip if another dialog is open
-        if (Gdx.input.justTouched() && !showRouteAssignDialog) {
+        if (Gdx.input.isButtonJustPressed(Input.Buttons.LEFT) && !showRouteAssignDialog) {
             float mx = Gdx.input.getX();
             float my = Gdx.graphics.getHeight() - Gdx.input.getY();
 
@@ -1070,6 +1128,18 @@ public class GameScreen implements Screen {
                 }
             }
         }
+    }
+
+    private int countMapStops() { return collectMapStops().size(); }
+
+    private List<StopOverlay> collectMapStops() {
+        List<StopOverlay> stops = new ArrayList<>();
+        for (int x = 0; x < gameState.getMap().size.width; x++)
+            for (int y = 0; y < gameState.getMap().size.height; y++) {
+                Tile t = gameState.getMap().getTile(new TileCoord(x, y));
+                if (t != null && t.getOverlay() instanceof StopOverlay s) stops.add(s);
+            }
+        return stops;
     }
 
     @Override public void pause() {}

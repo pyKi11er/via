@@ -45,9 +45,11 @@ public class Route {
         return stops.get((idx + 1) % stops.size());
     }
 
-    /** Circular next stop after a current index. */
-    public StopOverlay getNextStop(int currentIndex) {
-        if (stops.isEmpty()) return null;
-        return stops.get(Math.floorMod(currentIndex + 1, stops.size()));
+    /**
+     * Next leg destination: {@code routeStopIndex} is the cursor for the upcoming stop (wrapped).
+     * After {@code assignRoute}, use 0 to target the first stop in the list.
+     */
+    public StopOverlay getNextStop(int routeStopIndex) {
+        return getStop(routeStopIndex);
     }
 }

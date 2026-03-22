@@ -1,6 +1,5 @@
 package com.via.controller;
 
-import com.via.model.*;
 import com.via.model.building.Road;
 import com.via.model.building.StopAccess;
 import com.via.model.building.StopOverlay;
@@ -22,22 +21,27 @@ public class StopBuilder {
         this.baseCost = baseCost;
     }
 
-    public boolean placeStop(String name, TileCoord coord, StopAccess access, Storage storage) {
-
+    /** True if a stop could be placed here (no side effects). */
+    public boolean canPlaceStopAt(TileCoord coord) {
+        if (coord == null || map == null) return false;
         Tile tile = map.getTile(coord);
-        System.out.println("Stop placed at: " + coord.x + "," + coord.y
-            + " on road: " + (tile.getStructure() instanceof Road));
-        if (tile == null || !(tile.getStructure() instanceof Road) || tile.getOverlay() != null)
+        if (tile == null || !(tile.getStructure() instanceof Road) || tile.getOverlay() != null) {
             return false;
-
-        // Must have at least one adjacent road
-        boolean adjacentRoad = map.getAdjacentCoords(coord).stream()
+        }
+        return map.getAdjacentCoords(coord).stream()
             .map(map::getTile)
             .anyMatch(t -> t != null && t.getStructure() instanceof Road);
+    }
 
-        if (!adjacentRoad) throw new IllegalArgumentException("Stop must be adjacent to a road.");
+    public boolean placeStop(String name, TileCoord coord, StopAccess access, Storage storage) {
+        if (coord == null || access == null || storage == null || economy == null) return false;
+
+        if (!canPlaceStopAt(coord)) return false;
+
+        if (economy.getCapital() < baseCost) return false;
 
         economy.deduct(baseCost);
+        Tile tile = map.getTile(coord);
         tile.setOverlay(new StopOverlay(name, coord, access, storage));
         return true;
     }

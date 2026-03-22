@@ -1,120 +1,111 @@
 package com.via.controller;
 
-import com.via.model.*;
+import com.via.model.Constants;
+import com.via.model.GameState;
 import com.via.model.building.City;
 import com.via.model.building.Facility;
 import com.via.model.building.PassengerDemand;
 import com.via.model.building.StopOverlay;
 import com.via.model.economy.ConsumptionItem;
+import com.via.model.economy.ConsumptionRule;
 import com.via.model.economy.Storage;
 import com.via.model.enums.GoodType;
 import com.via.model.map.Map;
 import com.via.model.map.Structure;
 import com.via.model.map.Tile;
 import com.via.model.map.TileCoord;
-import com.via.model.vehicle.Vehicle;
+import com.via.model.vehicle.Cargo;
 
-import java.util.ArrayList;
-
+/**
+ * Income is credited only when a vehicle unloads cargo at a stop and that cargo
+ * satisfies adjacent demand (facility consumption inputs or city passenger demand).
+ */
 public class EconomySystem {
 
     public void tick(GameState state) {
-        if (state == null || state.getEconomy() == null || state.getTimeState() == null) return;
-
-        processStopDeliveries(state);
+        if (state == null || state.getEconomy() == null) return;
 
         if (state.getEconomy().getCapital() < 0) {
             state.setGameOver(true);
         }
     }
 
-    private void processStopDeliveries(GameState state) {
+    /**
+     * Called from movement when a vehicle unloads at a route stop. Matching demand
+     * is delivered into adjacent facility/city storage and earns income; any remainder
+     * stays at the stop.
+     */
+    public void processVehicleUnload(GameState state, StopOverlay stop, Cargo cargo) {
+        if (state == null || state.getEconomy() == null || stop == null) return;
+        if (cargo == null || cargo.getAmount() <= 0) return;
+
+        Storage stopStorage = stop.getStorage();
+        if (stopStorage == null) return;
+
         Map map = state.getMap();
         if (map == null) return;
 
-        for (int x = 0; x < map.size.width; x++) {
-            for (int y = 0; y < map.size.height; y++) {
-                TileCoord coord = new TileCoord(x, y);
-                Tile tile = map.getTile(coord);
-                if (tile == null) continue;
-                if (!(tile.getOverlay() instanceof StopOverlay stop)) continue;
-                deliverToAdjacentDemand(state, map, stop);
-            }
-        }
-    }
-
-    private void deliverToAdjacentDemand(GameState state, Map map, StopOverlay stop) {
-        Storage storage = stop.getStorage();
-        if (storage == null) return;
+        GoodType type = cargo.getType();
+        int remaining = cargo.getAmount();
 
         for (TileCoord adjacent : map.getAdjacentCoords(stop.getLocation())) {
-            Tile adjacentTile = map.getTile(adjacent);
-            if (adjacentTile == null) continue;
+            Tile tile = map.getTile(adjacent);
+            if (tile == null) continue;
 
-            Structure s = adjacentTile.getStructure();
+            Structure s = tile.getStructure();
             if (s instanceof Facility facility) {
-                deliverToFacility(state, storage, facility);
-            } else if (s instanceof City city) {
-                deliverPassengersToCity(state, storage, city);
+                remaining = deliverUnloadToFacility(state, facility, type, remaining);
+            } else if (s instanceof City city && type == GoodType.PASSENGERS) {
+                remaining = deliverUnloadPassengersToCity(state, city, remaining);
             }
         }
-    }
 
-    //----------------------FIX NEEDED generates income when the facility consumes the delivered good.
-    // WOOD is being delivered to the Steel Mill but Steel Mill consumes IRON not WOOD — so no income.
-
-//    private void deliverToFacility(GameState state, Storage storage, Facility facility) {
-//        if (facility.getConsumption() == null) return;
-//
-//        for (ConsumptionItem item : facility.getConsumption().getInputs()) {
-//            if (item == null) continue;
-//            int available = storage.getAmount(item.type);
-//            if (available <= 0) continue;
-//
-//            int deliver = Math.min(available, Math.max(0, item.amount));
-//            if (deliver <= 0) continue;
-//
-//            storage.removeAmount(item.type, deliver);
-//            long income = calculateIncome(item.type, deliver, item.amount);
-//            state.getEconomy().earn(income);
-//        }
-//    }
-
-
-//    --------------QUICK FIX FOR THE DEMO ONLY
-    private void deliverToFacility(GameState state, Storage storage, Facility facility) {
-        // Generate income for any goods delivered regardless of consumption rules
-        for (GoodType type : new ArrayList<>(storage.getContents().keySet())) {
-            int available = storage.getAmount(type);
-            if (available <= 0) continue;
-            storage.removeAmount(type, available);
-            long income = calculateIncome(type, available, 10);
-            state.getEconomy().earn(income);
+        if (remaining > 0) {
+            stopStorage.addContents(type, remaining);
         }
     }
 
-    private void deliverPassengersToCity(GameState state, Storage storage, City city) {
-        PassengerDemand demand = city.getPassengerDemand();
-        if (demand == null) return;
+    private int deliverUnloadToFacility(GameState state, Facility facility, GoodType type, int amount) {
+        if (amount <= 0) return 0;
 
-        int available = storage.getAmount(GoodType.PASSENGERS);
-        if (available <= 0) return;
+        ConsumptionRule rule = facility.getConsumption();
+        if (rule == null) return amount;
+
+        ConsumptionItem match = null;
+        for (ConsumptionItem item : rule.getInputs()) {
+            if (item != null && item.type == type) {
+                match = item;
+                break;
+            }
+        }
+        if (match == null) return amount;
+
+        Storage facilityStorage = facility.getStorage();
+        if (facilityStorage == null) return amount;
+
+        facilityStorage.addContents(type, amount);
+        long income = calculateIncome(type, amount, match.amount);
+        state.getEconomy().earn(income);
+        return 0;
+    }
+
+    private int deliverUnloadPassengersToCity(GameState state, City city, int amount) {
+        if (amount <= 0) return 0;
+
+        PassengerDemand demand = city.getPassengerDemand();
+        if (demand == null) return amount;
 
         int perTickDemand = (int) Math.ceil(Math.max(0f, demand.getRatePerTick()));
-        if (perTickDemand <= 0) return;
+        if (perTickDemand <= 0) return amount;
 
-        int deliver = Math.min(available, perTickDemand);
-        storage.removeAmount(GoodType.PASSENGERS, deliver);
-
-        long income = calculateIncome(GoodType.PASSENGERS, deliver, perTickDemand);
+        long income = calculateIncome(GoodType.PASSENGERS, amount, perTickDemand);
         state.getEconomy().earn(income);
+        return 0;
     }
 
     /**
-     * Current pricing model (simple + deterministic for tests):
      * income = deliveredAmount * basePrice(type) * demandMultiplier, where demandMultiplier is:
-     * - 2 if demandPerTick >= 10
-     * - 1 otherwise
+     * 2 if demandPerTick &gt;= 10, else 1.
      */
     public long calculateIncome(GoodType type, int deliveredAmount, int demandPerTick) {
         if (deliveredAmount <= 0) return 0;
@@ -123,4 +114,3 @@ public class EconomySystem {
         return deliveredAmount * base * multiplier;
     }
 }
-

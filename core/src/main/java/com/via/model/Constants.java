@@ -13,6 +13,9 @@ public class Constants {
     public static final float VERY_FAST_MULTIPLIER = 4f;
     public static final long STARTING_CAPITAL = 100_000L;
 
+    /** Cost to place one stop (used by {@link com.via.controller.StopBuilder}). */
+    public static final int STOP_PLACEMENT_COST = 2_000;
+
     /** Deduct maintenance once per interval per vehicle. */
     public static final int VEHICLE_MAINTENANCE_INTERVAL_TICKS = 18000; // 1 minute in game
 

@@ -12,13 +12,12 @@ public class SimulationSystem {
     private final VehicleMaintenanceSystem vehicleMaintenanceSystem;
 
     public SimulationSystem() {
-        this(
-            new ForestSystem(),
-            new EconomySystem(),
-            new FacilitySystem(),
-            new VehicleMovementSystem(),
-            new VehicleMaintenanceSystem()
-        );
+        EconomySystem economySystem = new EconomySystem();
+        this.forestSystem = new ForestSystem();
+        this.economySystem = economySystem;
+        this.facilitySystem = new FacilitySystem();
+        this.vehicleMovementSystem = new VehicleMovementSystem(economySystem);
+        this.vehicleMaintenanceSystem = new VehicleMaintenanceSystem();
     }
 
     public SimulationSystem(
@@ -47,9 +46,9 @@ public class SimulationSystem {
         forestSystem.tick(state);
         facilitySystem.tick(state);           // 1. produce goods + transfer to stops
         vehicleMaintenanceSystem.tickBeforeMovement(state); // 2. maintenance checks
-        vehicleMovementSystem.tick(state, timeMultiplier);  // 3. vehicles move + load/unload
+        vehicleMovementSystem.tick(state, timeMultiplier);  // 3. vehicles move + load/unload (income on unload)
         vehicleMaintenanceSystem.tickAfterMovement(state);  // 4. restore after garage
-        economySystem.tick(state);            // 5. process deliveries + income LAST
+        economySystem.tick(state);            // 5. game-over / capital checks only
     }
 
 

@@ -63,6 +63,10 @@ public class MapInitializer {
         if (steelStop  != null) validStops.add(steelStop);
         if (cityStop   != null) validStops.add(cityStop);
 
+        if (cityStop != null && cityStop.getStorage() != null) {
+            cityStop.getStorage().addContents(GoodType.PASSENGERS, 48);
+        }
+
         Route route = new Route(validStops);
         state.addRoute(route);
 
@@ -83,7 +87,7 @@ public class MapInitializer {
     }
 
     private static void buildMine(Map map, GameState state) {
-        ProductionRule  prod = new ProductionRule(List.of(new ProductionItem(GoodType.IRON, 5))); // WAS 10 LOWERED FOR DEMO ECONOMYSYSTEM NOT WORKING PROPERLY
+        ProductionRule  prod = new ProductionRule(List.of(new ProductionItem(GoodType.IRON, 10)));
         ConsumptionRule cons = new ConsumptionRule(List.of());
         Facility mine = new Facility(new Footprint(MINE_ORIGIN, 2, 2), prod, cons);
         stampBuilding(map, mine);
@@ -91,7 +95,7 @@ public class MapInitializer {
     }
 
     private static void buildForestCamp(Map map, GameState state) {
-        ProductionRule  prod = new ProductionRule(List.of(new ProductionItem(GoodType.WOOD, 4))); // WAS 8 LOWERED DUE TO ECONOMYSYSTEM ERROR FOR THE DEMO
+        ProductionRule  prod = new ProductionRule(List.of(new ProductionItem(GoodType.WOOD, 8)));
         ConsumptionRule cons = new ConsumptionRule(List.of());
         Facility forestCamp = new Facility(new Footprint(FOREST_ORIGIN, 2, 2), prod, cons);
         stampBuilding(map, forestCamp);

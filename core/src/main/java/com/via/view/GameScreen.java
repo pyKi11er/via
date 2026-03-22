@@ -15,6 +15,7 @@ import com.badlogic.gdx.math.Rectangle;
 import com.badlogic.gdx.math.Vector3;
 import com.badlogic.gdx.utils.ScreenUtils;
 import com.via.VIA;
+import com.via.controller.GameController;
 import com.via.controller.GameEngine;
 import com.via.controller.RoadBuilder;
 import com.via.controller.StopBuilder;
@@ -27,6 +28,11 @@ import com.via.model.enums.Direction;
 import com.via.model.enums.SpeedSetting;
 import com.via.model.map.Tile;
 import com.via.model.map.TileCoord;
+import com.via.model.vehicle.Route;
+import com.via.model.vehicle.Vehicle;
+
+import java.util.ArrayList;
+import java.util.List;
 
 public class GameScreen implements Screen {
 
@@ -81,6 +87,17 @@ public class GameScreen implements Screen {
     private final Rectangle[] buildOptions = new Rectangle[4];
     private final String[] buildLabels = {"Road", "Stop", "Garage", "Terraform"};
     private int activeBuildOption = -1;
+
+    // buy popup — one button per catalog entry
+    private final Rectangle[] buyBtns = new Rectangle[GameController.VEHICLE_CATALOG.size()];
+
+    // post-purchase route assignment dialog
+    private boolean showRouteAssignDialog = false;
+    private Vehicle pendingVehicle = null;
+    private String pendingVehicleName = "";
+    private final List<Rectangle> routeAssignBtns = new ArrayList<>();
+    private Rectangle rBtnSkipRoute;
+    private Rectangle rRouteAssignDialog;
 
     // short message shown at the top after player actions
     private String feedbackMsg = "";
@@ -175,7 +192,7 @@ public class GameScreen implements Screen {
 
         ScreenUtils.clear(0.2f, 0.5f, 0.2f, 1f);
 
-        if (!showExitDialog) handleMapInput(delta);
+        if (!showExitDialog && !showRouteAssignDialog) handleMapInput(delta);
 
         // draw the world map
         mapCamera.update();
@@ -195,6 +212,7 @@ public class GameScreen implements Screen {
 
         if (showPopup) drawPopup();
         if (showExitDialog) drawExitDialog();
+        if (showRouteAssignDialog) drawRouteAssignDialog();
 
         drawFeedback();
     }
@@ -455,8 +473,12 @@ public class GameScreen implements Screen {
     }
 
     private void drawPopup() {
-        // popup position follows the active tab
-        rPopup = new Rectangle(tabBtns[activeTab].x, BOT_BAR_H + 5f, 600f, 60f);
+        // popup size varies by tab; Buy tab is taller and wider
+        boolean isBuyTab = (activeTab == 2);
+        float popupX = isBuyTab ? 8f : tabBtns[activeTab].x;
+        float popupW = isBuyTab ? 720f : 600f;
+        float popupH = isBuyTab ? 290f : 60f;
+        rPopup = new Rectangle(popupX, BOT_BAR_H + 5f, popupW, popupH);
         rPopupClose = new Rectangle(
             rPopup.x + rPopup.width - 24f,
             rPopup.y + rPopup.height - 24f,
@@ -479,7 +501,7 @@ public class GameScreen implements Screen {
             rPopupClose.y + (rPopupClose.height + gl.height) / 2f);
         batch.end();
 
-        // Build tab shows Road / Stop / Garage / Terraform options
+        // Build tab — Road / Stop / Garage / Terraform options
         if (activeTab == 0) {
             float optW = 130f, optH = rPopup.height - 16f;
             float optY = rPopup.y + 8f, gap = 6f;
@@ -505,7 +527,74 @@ public class GameScreen implements Screen {
             }
         }
 
-        if (Gdx.input.justTouched()) {
+        // Buy tab — vehicle catalog rows
+        if (activeTab == 2) {
+            List<GameController.VehicleCatalogEntry> catalog = GameController.VEHICLE_CATALOG;
+            float padX = 10f;
+            float baseX = rPopup.x + padX + 4f;
+            float rowH = 35f;
+            float headerH = 24f;
+            float topY = rPopup.y + rPopup.height - 36f; // leaves room for stripe + close btn
+
+            // header row background
+            float headerY = topY - headerH;
+            sr.begin(ShapeRenderer.ShapeType.Filled);
+            sr.setColor(0.12f, 0.16f, 0.26f, 1f);
+            sr.rect(rPopup.x + padX, headerY, rPopup.width - padX * 2f - 26f, headerH);
+            sr.end();
+
+            font.getData().setScale(1.0f);
+            batch.begin();
+            font.setColor(new Color(0.70f, 0.80f, 1.0f, 1f));
+            float hY = headerY + headerH / 2f + 7f;
+            font.draw(batch, "Vehicle",  baseX,          hY);
+            font.draw(batch, "Cap",      baseX + 128f,   hY);
+            font.draw(batch, "Speed",    baseX + 192f,   hY);
+            font.draw(batch, "Maint/c",  baseX + 268f,   hY);
+            font.draw(batch, "Cost",     baseX + 368f,   hY);
+            batch.end();
+            font.getData().setScale(1.4f);
+
+            // vehicle rows
+            float curY = headerY - 4f;
+            for (int i = 0; i < catalog.size(); i++) {
+                curY -= rowH;
+                float rowY = curY;
+                GameController.VehicleCatalogEntry entry = catalog.get(i);
+                boolean canAfford = gameState.getEconomy().getCapital() >= entry.purchaseCost();
+
+                // alternating row background
+                sr.begin(ShapeRenderer.ShapeType.Filled);
+                sr.setColor(i % 2 == 0
+                    ? new Color(0.10f, 0.14f, 0.22f, 1f)
+                    : new Color(0.12f, 0.17f, 0.27f, 1f));
+                sr.rect(rPopup.x + padX, rowY, rPopup.width - padX * 2f - 26f, rowH);
+                sr.end();
+
+                // Buy button
+                buyBtns[i] = new Rectangle(rPopup.x + rPopup.width - 26f - 84f, rowY + 4f, 82f, rowH - 8f);
+                Color btnColor = canAfford
+                    ? new Color(0.15f, 0.55f, 0.25f, 1f)
+                    : new Color(0.45f, 0.20f, 0.20f, 1f);
+                drawBtn(buyBtns[i], "Buy", btnColor);
+
+                // row text
+                font.getData().setScale(1.0f);
+                batch.begin();
+                font.setColor(canAfford ? Color.WHITE : new Color(0.50f, 0.50f, 0.50f, 1f));
+                float tY = rowY + rowH / 2f + 7f;
+                font.draw(batch, entry.displayName(),                   baseX,        tY);
+                font.draw(batch, String.valueOf(entry.capacity()),       baseX + 128f, tY);
+                font.draw(batch, String.format("%.2f", entry.speed()),   baseX + 192f, tY);
+                font.draw(batch, "$" + entry.maintenanceCost(),          baseX + 268f, tY);
+                font.draw(batch, String.format("$%,d", entry.purchaseCost()), baseX + 368f, tY);
+                batch.end();
+                font.getData().setScale(1.4f);
+            }
+        }
+
+        // input handling — skip if another dialog is open
+        if (Gdx.input.justTouched() && !showRouteAssignDialog) {
             float mx = Gdx.input.getX();
             float my = Gdx.graphics.getHeight() - Gdx.input.getY();
 
@@ -519,10 +608,30 @@ public class GameScreen implements Screen {
             if (activeTab == 0) {
                 for (int i = 0; i < buildOptions.length; i++) {
                     if (buildOptions[i] != null && buildOptions[i].contains(mx, my)) {
-                        // clicking same option again deselects it
                         activeBuildOption = (activeBuildOption == i) ? -1 : i;
                         if (activeBuildOption >= 0)
                             showFeedback("Click tiles to place: " + buildLabels[activeBuildOption], Color.YELLOW);
+                        return;
+                    }
+                }
+            }
+
+            if (activeTab == 2) {
+                for (int i = 0; i < buyBtns.length; i++) {
+                    if (buyBtns[i] != null && buyBtns[i].contains(mx, my)) {
+                        GameController.VehicleCatalogEntry entry = GameController.VEHICLE_CATALOG.get(i);
+                        String error = GameController.buyVehicle(gameState, entry.type());
+                        if (error != null) {
+                            showFeedback(error, Color.RED);
+                        } else {
+                            showFeedback("Purchased: " + entry.displayName() + "!", Color.GREEN);
+                            List<Vehicle> vehicles = gameState.getVehicles();
+                            if (!vehicles.isEmpty() && !gameState.getRoutes().isEmpty()) {
+                                pendingVehicle = vehicles.get(vehicles.size() - 1);
+                                pendingVehicleName = entry.displayName();
+                                showRouteAssignDialog = true;
+                            }
+                        }
                         return;
                     }
                 }
@@ -612,6 +721,80 @@ public class GameScreen implements Screen {
         font.setColor(color);
         font.draw(batch, text, x, y);
         batch.end();
+    }
+
+    private void drawRouteAssignDialog() {
+        List<Route> routes = gameState.getRoutes();
+        float w = Gdx.graphics.getWidth(), h = Gdx.graphics.getHeight();
+
+        float dW = 480f;
+        float dH = 120f + routes.size() * 50f + 60f;
+        float dX = w / 2f - dW / 2f;
+        float dY = h / 2f - dH / 2f;
+        rRouteAssignDialog = new Rectangle(dX, dY, dW, dH);
+
+        // dim overlay
+        Gdx.gl.glEnable(GL20.GL_BLEND);
+        Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
+        sr.begin(ShapeRenderer.ShapeType.Filled);
+        sr.setColor(0f, 0f, 0f, 0.68f);
+        sr.rect(0, 0, w, h);
+        sr.setColor(0.07f, 0.10f, 0.17f, 0.97f);
+        sr.rect(dX, dY, dW, dH);
+        sr.end();
+        Gdx.gl.glDisable(GL20.GL_BLEND);
+
+        batch.begin();
+        batch.setColor(1f, 1f, 1f, 0.20f);
+        batch.draw(texPanel, dX, dY, dW, dH);
+        batch.end();
+
+        sr.begin(ShapeRenderer.ShapeType.Filled);
+        sr.setColor(0.20f, 0.47f, 0.80f, 1f);
+        sr.rect(dX, dY + dH - 4f, dW, 4f);
+        sr.end();
+
+        float cx = dX + dW / 2f;
+        drawCentred("Assign Route", cx, dY + dH - 18f, Color.WHITE);
+        drawCentred(pendingVehicleName + " is ready — assign to a route?",
+            cx, dY + dH - 44f, new Color(0.80f, 0.85f, 0.95f, 1f));
+
+        // route buttons
+        routeAssignBtns.clear();
+        float btnY = dY + dH - 90f;
+        for (int i = 0; i < routes.size(); i++) {
+            btnY -= 50f;
+            Route r = routes.get(i);
+            Rectangle btn = new Rectangle(dX + 20f, btnY, dW - 40f, 42f);
+            routeAssignBtns.add(btn);
+            String label = "Route " + (i + 1) + "  (" + r.size() + " stops)";
+            drawBtn(btn, label, new Color(0.20f, 0.47f, 0.80f, 1f));
+        }
+
+        rBtnSkipRoute = new Rectangle(cx - 55f, dY + 14f, 110f, 38f);
+        drawBtn(rBtnSkipRoute, "Skip", new Color(0.35f, 0.38f, 0.48f, 1f));
+
+        // input handling
+        if (Gdx.input.justTouched()) {
+            float mx = Gdx.input.getX();
+            float my = Gdx.graphics.getHeight() - Gdx.input.getY();
+
+            if (rBtnSkipRoute.contains(mx, my)) {
+                showRouteAssignDialog = false;
+                pendingVehicle = null;
+                return;
+            }
+
+            for (int i = 0; i < routeAssignBtns.size(); i++) {
+                if (routeAssignBtns.get(i).contains(mx, my) && i < routes.size()) {
+                    GameController.assignVehicleToRoute(pendingVehicle, routes.get(i));
+                    showFeedback("Route assigned to " + pendingVehicleName + "!", Color.GREEN);
+                    showRouteAssignDialog = false;
+                    pendingVehicle = null;
+                    return;
+                }
+            }
+        }
     }
 
     @Override public void pause() {}

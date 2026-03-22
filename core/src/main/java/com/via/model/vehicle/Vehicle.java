@@ -23,6 +23,8 @@ public abstract class Vehicle {
     private long ageTicks;
     private long maintenanceDueTick;
 
+    private int stopWaitTicks;
+
     private boolean returningToGarage;
     private Route routeBeforeGarage;
     private int routeStopIndexBeforeGarage;
@@ -61,6 +63,9 @@ public abstract class Vehicle {
         this.routeStopIndexBeforeGarage = 0;
         this.maintenanceTargetCoord = null;
     }
+
+    public int getStopWaitTicks() { return stopWaitTicks; }
+    public void setStopWaitTicks(int ticks) { this.stopWaitTicks = ticks; }
 
     public UUID getId() {
         return id;

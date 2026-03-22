@@ -119,6 +119,7 @@ public class GameScreen implements Screen {
 
     // tile under the cursor in build mode
     private TileCoord hoveredTile = null;
+    private TileCoord lastDragTile = null;
 
     public GameScreen(VIA game, GameState gameState) {
         this.game = game;
@@ -287,6 +288,18 @@ public class GameScreen implements Screen {
         if (Gdx.input.isButtonPressed(Input.Buttons.RIGHT))
             mapCamera.translate(-Gdx.input.getDeltaX(), Gdx.input.getDeltaY());
 
+        // Road drag — hold LMB to paint roads continuously
+        if (activeBuildOption == 0 && Gdx.input.isButtonPressed(Input.Buttons.LEFT)) {
+            Vector3 dw = new Vector3(Gdx.input.getX(), Gdx.input.getY(), 0);
+            mapCamera.unproject(dw);
+            TileCoord dc = new TileCoord((int)(dw.x / Constants.TILE_SIZE), (int)(dw.y / Constants.TILE_SIZE));
+            if (!dc.equals(lastDragTile) && gameState.getMap().isWithinBounds(dc)) {
+                lastDragTile = dc;
+                try { roadBuilder.buildRoad(dc); } catch (IllegalArgumentException ignored) {}
+            }
+        }
+        if (!Gdx.input.isButtonPressed(Input.Buttons.LEFT)) lastDragTile = null;
+
         // Only process left clicks for interaction
         if (!Gdx.input.justTouched() || !Gdx.input.isButtonJustPressed(Input.Buttons.LEFT)) return;
 
@@ -337,13 +350,7 @@ public class GameScreen implements Screen {
         if (!gameState.getMap().isWithinBounds(coord)) return;
 
         if (activeBuildOption == 0) {
-            try {
-                boolean placed = roadBuilder.buildRoad(coord);
-                if (placed) showFeedback("Road built!", Color.GREEN);
-                else showFeedback("Tile is already occupied.", Color.RED);
-            } catch (IllegalArgumentException e) {
-                showFeedback(e.getMessage(), Color.RED);
-            }
+            // handled by drag logic above
             return;
         }
 

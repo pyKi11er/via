@@ -19,6 +19,7 @@ public class VehicleMovementSystem {
 
     private static final int   MAX_VEHICLES_PER_TILE = 2;
     private static final float BASE_DELTA             = 0.016f;
+    private static final int   STOP_WAIT_TICKS        = 60; // ~1 second at normal speed
 
     private final EconomySystem economySystem;
 
@@ -52,6 +53,12 @@ public class VehicleMovementSystem {
 
     private void updateVehicleMovement(GameState state, Vehicle v,
                                        VehiclePosition pos, Map map, float delta) {
+        // Waiting at a stop
+        if (v.getStopWaitTicks() > 0) {
+            v.setStopWaitTicks(v.getStopWaitTicks() - 1);
+            return;
+        }
+
         float speed       = v.getSpeed();
         double slopeFactor = map.getVehicleSpeedMultiplier(pos.getOrigin(), pos.getDestination());
         float appliedSpeed = (float)(speed * slopeFactor);
@@ -71,22 +78,13 @@ public class VehicleMovementSystem {
             unloadAtStop(state, v, currentStop);
             loadFromStop(v, currentStop);
             v.advanceToNextStop();
-            pathCache.remove(v.getId()); // destination changed — clear cached path
+            pathCache.remove(v.getId());
+            v.setStopWaitTicks(STOP_WAIT_TICKS);
+            // fall through to compute next destination so the vehicle moves after wait
         }
 
         StopOverlay nextStop = v.getNextStop();
-        if (nextStop == null) {
-            return;
-        }
-
-        // If already at the next stop location, advance immediately
-        if (pos.getOrigin().equals(nextStop.getLocation())) {
-            unloadAtStop(state, v, nextStop);
-            loadFromStop(v, nextStop);
-            v.advanceToNextStop();
-            pathCache.remove(v.getId());
-            return;
-        }
+        if (nextStop == null) return;
 
         // Only cache successful paths — never cache empty (failed) paths
         Queue<TileCoord> plannedPath = pathCache.get(v.getId());
@@ -95,7 +93,7 @@ public class VehicleMovementSystem {
             if (!plannedPath.isEmpty()) {
                 pathCache.put(v.getId(), plannedPath);
             } else {
-                return; // no path found — retry next tick
+                return;
             }
         }
 

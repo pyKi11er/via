@@ -208,9 +208,8 @@ public class WorldMapRenderer {
     private TextureRegion getVehicleSprite(Vehicle v) {
         int idx = getMovementDirection(v.getPosition()).ordinal();
         return switch (v.getType()) {
-            case TRUCK -> truckSprites[idx];
-            case BUS   -> busSprites[idx];
-            default    -> fallbackTiles[9][8];
+            case TRUCK, MINI_TRUCK, HEAVY_TRUCK -> truckSprites[idx];
+            case BUS, EXPRESS_BUS, CITY_BUS     -> busSprites[idx];
         };
     }
 

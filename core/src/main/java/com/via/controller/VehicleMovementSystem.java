@@ -1,12 +1,14 @@
 package com.via.controller;
 
 import com.via.model.GameState;
+import com.via.model.building.City;
 import com.via.model.building.Road;
 import com.via.model.building.StopOverlay;
 import com.via.model.economy.Storage;
 import com.via.model.enums.GoodType;
 import com.via.model.enums.VehicleType;
 import com.via.model.map.Map;
+import com.via.model.map.Structure;
 import com.via.model.map.Tile;
 import com.via.model.map.TileCoord;
 import com.via.model.vehicle.*;
@@ -64,15 +66,27 @@ public class VehicleMovementSystem {
         pos.setOrigin(pos.getDestination());
         pos.setProgress(0f);
 
+        StopOverlay currentStop = getStopAtCoord(v, pos.getOrigin());
+        if (currentStop != null) {
+            unloadAtStop(state, v, currentStop);
+            loadFromStop(v, currentStop);
+            v.advanceToNextStop();
+            pathCache.remove(v.getId()); // destination changed — clear cached path
+        }
+
         StopOverlay nextStop = v.getNextStop();
-        if (nextStop != null && nextStop.getLocation().equals(pos.getOrigin())) {
+        if (nextStop == null) {
+            return;
+        }
+
+        // If already at the next stop location, advance immediately
+        if (pos.getOrigin().equals(nextStop.getLocation())) {
             unloadAtStop(state, v, nextStop);
             loadFromStop(v, nextStop);
             v.advanceToNextStop();
             pathCache.remove(v.getId());
-            nextStop = v.getNextStop();
+            return;
         }
-        if (nextStop == null) return;
 
         // Only cache successful paths — never cache empty (failed) paths
         Queue<TileCoord> plannedPath = pathCache.get(v.getId());
@@ -147,7 +161,7 @@ public class VehicleMovementSystem {
 
             for (TileCoord neighbor : map.getAdjacentCoords(current)) {
                 if (!visited.contains(neighbor)
-                    && (isRoadTile(map, neighbor) || neighbor.equals(goal))) {
+                    && (isTraversable(map, neighbor) || neighbor.equals(goal))) {
                     queue.add(neighbor);
                     visited.add(neighbor);
                     cameFrom.put(neighbor, current);
@@ -164,6 +178,18 @@ public class VehicleMovementSystem {
             step = cameFrom.get(step);
         }
         return path;
+    }
+
+    /**
+     * Returns true if a vehicle can traverse this tile.
+     * Allows: Road tiles and City tiles (cities have internal road networks).
+     */
+    private boolean isTraversable(Map map, TileCoord c) {
+        Tile t = map.getTile(c);
+        if (t == null) return false;
+        Structure s = t.getStructure();
+        return s instanceof Road
+            || s instanceof com.via.model.building.City;
     }
 
     private boolean isRoadTile(Map map, TileCoord c) {
@@ -197,4 +223,12 @@ public class VehicleMovementSystem {
     // Stop lookup
     // ══════════════════════════════════════════════════════════════════════════
 
+    private StopOverlay getStopAtCoord(Vehicle v, TileCoord coord) {
+        Route route = v.getAssignedRoute();
+        if (route == null) return null;
+        for (StopOverlay stop : route.getStops()) {
+            if (stop.getLocation().equals(coord)) return stop;
+        }
+        return null;
+    }
 }

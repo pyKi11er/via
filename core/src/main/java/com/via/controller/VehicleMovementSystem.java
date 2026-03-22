@@ -64,15 +64,14 @@ public class VehicleMovementSystem {
         pos.setOrigin(pos.getDestination());
         pos.setProgress(0f);
 
-        StopOverlay currentStop = getStopAtCoord(v, pos.getOrigin());
-        if (currentStop != null) {
-            unloadAtStop(state, v, currentStop);
-            loadFromStop(v, currentStop);
-            v.advanceToNextStop();
-            pathCache.remove(v.getId()); // destination changed — clear cached path
-        }
-
         StopOverlay nextStop = v.getNextStop();
+        if (nextStop != null && nextStop.getLocation().equals(pos.getOrigin())) {
+            unloadAtStop(state, v, nextStop);
+            loadFromStop(v, nextStop);
+            v.advanceToNextStop();
+            pathCache.remove(v.getId());
+            nextStop = v.getNextStop();
+        }
         if (nextStop == null) return;
 
         // Only cache successful paths — never cache empty (failed) paths
@@ -198,12 +197,4 @@ public class VehicleMovementSystem {
     // Stop lookup
     // ══════════════════════════════════════════════════════════════════════════
 
-    private StopOverlay getStopAtCoord(Vehicle v, TileCoord coord) {
-        Route route = v.getAssignedRoute();
-        if (route == null) return null;
-        for (StopOverlay stop : route.getStops()) {
-            if (stop.getLocation().equals(coord)) return stop;
-        }
-        return null;
-    }
 }

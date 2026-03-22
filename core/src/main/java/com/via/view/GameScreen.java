@@ -21,12 +21,7 @@ import com.via.controller.RoadBuilder;
 import com.via.controller.StopBuilder;
 import com.via.model.Constants;
 import com.via.model.GameState;
-import com.via.model.building.City;
-import com.via.model.building.Facility;
-import com.via.model.building.Garage;
-import com.via.model.building.Road;
-import com.via.model.building.StopAccess;
-import com.via.model.building.StopOverlay;
+import com.via.model.building.*;
 import com.via.model.economy.Storage;
 import com.via.model.map.Structure;
 import com.via.model.map.Terrain;
@@ -83,7 +78,7 @@ public class GameScreen implements Screen {
 
     // bottom-left tabs
     private final Rectangle[] tabBtns = new Rectangle[4];
-    private final String[] tabLabels = {"Build", "Roads", "Buy", "..."};
+    private final String[] tabLabels = {"Build", "Routes", "Buy", "Vehicles"};
     private int activeTab = -1;
 
     private boolean showPopup = false;
@@ -100,6 +95,14 @@ public class GameScreen implements Screen {
 
     // buy popup — one button per catalog entry
     private final Rectangle[] buyBtns = new Rectangle[GameController.VEHICLE_CATALOG.size()];
+
+    // route creation UI
+    private final List<Rectangle> stopCheckboxes = new ArrayList<>();
+    private final List<Boolean> selectedStops = new ArrayList<>();
+    private Rectangle rBtnCreateRoute;
+
+    // vehicle management UI
+    private final List<Rectangle> vehicleAssignBtns = new ArrayList<>();
 
     // post-purchase route assignment dialog
     private boolean showRouteAssignDialog = false;
@@ -284,7 +287,8 @@ public class GameScreen implements Screen {
         if (Gdx.input.isButtonPressed(Input.Buttons.RIGHT))
             mapCamera.translate(-Gdx.input.getDeltaX(), Gdx.input.getDeltaY());
 
-        if (!Gdx.input.isButtonJustPressed(Input.Buttons.LEFT)) return;
+        // Only process left clicks for interaction
+        if (!Gdx.input.justTouched() || !Gdx.input.isButtonJustPressed(Input.Buttons.LEFT)) return;
 
         float mx = Gdx.input.getX();
         float myHud = Gdx.graphics.getHeight() - Gdx.input.getY(); // flipped Y for HUD
@@ -354,9 +358,7 @@ public class GameScreen implements Screen {
             }
             StopAccess access = new StopAccess(AccessType.ROAD_TILE, coord, Direction.N);
             String name = "Stop " + playerStopSequence++;
-            StopOverlay placed = stopBuilder.placeStop(name, coord, access, new Storage());
-            if (placed != null) {
-                gameState.getRoutes().forEach(r -> r.addStop(placed));
+            if (stopBuilder.placeStop(name, coord, access, new Storage())) {
                 showFeedback("Stop built: " + name, Color.GREEN);
             } else {
                 showFeedback("Could not place stop.", Color.RED);
@@ -366,20 +368,12 @@ public class GameScreen implements Screen {
         if (activeBuildOption == 2) { showFeedback("Garage placement coming soon.", Color.YELLOW); return; }
         if (activeBuildOption == 3) { showFeedback("Terraform coming soon.", Color.YELLOW); return; }
 
-        // no build mode active — check for vehicle click
-        Vehicle clicked = vehicleAtTile(coord);
-        if (clicked != null) {
-            if (gameState.getRoutes().isEmpty()) {
-                showFeedback("No routes exist yet.", Color.YELLOW);
-            } else {
-                pendingVehicle = clicked;
-                pendingVehicleName = GameController.VEHICLE_CATALOG.stream()
-                    .filter(e -> e.type() == clicked.getType())
-                    .map(GameController.VehicleCatalogEntry::displayName)
-                    .findFirst().orElse(clicked.getType().name());
-                showRouteAssignDialog = true;
-            }
-            return;
+        // no build mode active — just print tile info to console
+        Tile tile = gameState.getMap().getTile(coord);
+        if (tile != null) {
+            System.out.println("Tile [" + tileX + "," + tileY + "]"
+                + " terrain=" + tile.getTerrain().getType()
+                + " structure=" + (tile.getStructure() == null ? "null" : tile.getStructure().getClass().getSimpleName()));
         }
     }
 
@@ -541,11 +535,11 @@ public class GameScreen implements Screen {
         for (Vehicle v : gameState.getVehicles()) {
             if (v.getPosition() == null) continue;
             float wx = mmLerp(v.getPosition().getOrigin().x,
-                              v.getPosition().getDestination().x,
-                              v.getPosition().getProgress()) * Constants.TILE_SIZE;
+                v.getPosition().getDestination().x,
+                v.getPosition().getProgress()) * Constants.TILE_SIZE;
             float wy = mmLerp(v.getPosition().getOrigin().y,
-                              v.getPosition().getDestination().y,
-                              v.getPosition().getProgress()) * Constants.TILE_SIZE;
+                v.getPosition().getDestination().y,
+                v.getPosition().getProgress()) * Constants.TILE_SIZE;
             float px = mmX + wx * scaleX;
             float py = mmY + wy * scaleY;
             boolean isBus = switch (v.getType()) {
@@ -553,7 +547,7 @@ public class GameScreen implements Screen {
                 default -> false;
             };
             sr.setColor(isBus ? new Color(0.20f, 0.65f, 0.95f, 1f)
-                              : new Color(0.95f, 0.65f, 0.10f, 1f));
+                : new Color(0.95f, 0.65f, 0.10f, 1f));
             sr.rect(px - 1.5f, py - 1.5f, 3f, 3f);
         }
 
@@ -598,20 +592,16 @@ public class GameScreen implements Screen {
         return a + (b - a) * t;
     }
 
-    private Vehicle vehicleAtTile(TileCoord coord) {
-        for (Vehicle v : gameState.getVehicles()) {
-            if (v.getPosition() != null && v.getPosition().getOrigin().equals(coord))
-                return v;
-        }
-        return null;
-    }
-
     private void drawPopup() {
         // popup size varies by tab; Buy tab is taller and wider
         boolean isBuyTab = (activeTab == 2);
-        float popupX = isBuyTab ? 8f : tabBtns[activeTab].x;
-        float popupW = isBuyTab ? 720f : 600f;
-        float popupH = isBuyTab ? 290f : 60f;
+        boolean isRoutesTab = (activeTab == 1);
+        boolean isVehiclesTab = (activeTab == 3);
+
+        float popupX = (isBuyTab || isRoutesTab || isVehiclesTab) ? 8f : tabBtns[activeTab].x;
+        float popupW = (isBuyTab || isRoutesTab || isVehiclesTab) ? 720f : 600f;
+        float popupH = isBuyTab ? 290f : (isRoutesTab || isVehiclesTab) ? 320f : 60f;
+
         rPopup = new Rectangle(popupX, BOT_BAR_H + 5f, popupW, popupH);
         rPopupClose = new Rectangle(
             rPopup.x + rPopup.width - 24f,
@@ -727,6 +717,95 @@ public class GameScreen implements Screen {
             }
         }
 
+        // Routes tab — create routes from placed stops
+        if (activeTab == 1) {
+            // Collect all stops from the map
+            List<StopOverlay> allStops = new ArrayList<>();
+            for (int x = 0; x < gameState.getMap().size.width; x++) {
+                for (int y = 0; y < gameState.getMap().size.height; y++) {
+                    Tile tile = gameState.getMap().getTile(new TileCoord(x, y));
+                    if (tile != null && tile.getOverlay() instanceof StopOverlay stop) {
+                        allStops.add(stop);
+                    }
+                }
+            }
+
+            font.getData().setScale(1.0f);
+            batch.begin();
+            font.setColor(Color.WHITE);
+            font.draw(batch, "Create Route - Select Stops:", rPopup.x + 12f, rPopup.y + rPopup.height - 20f);
+            batch.end();
+
+            // Ensure selectedStops list matches number of stops
+            while (selectedStops.size() < allStops.size()) selectedStops.add(false);
+            while (selectedStops.size() > allStops.size()) selectedStops.remove(selectedStops.size() - 1);
+
+            stopCheckboxes.clear();
+            float checkY = rPopup.y + rPopup.height - 48f;
+            for (int i = 0; i < allStops.size(); i++) {
+                StopOverlay stop = allStops.get(i);
+                Rectangle checkBox = new Rectangle(rPopup.x + 12f, checkY - i * 28f, 18f, 18f);
+                stopCheckboxes.add(checkBox);
+
+                // Draw checkbox
+                sr.begin(ShapeRenderer.ShapeType.Filled);
+                sr.setColor(0.18f, 0.22f, 0.32f, 1f);
+                sr.rect(checkBox.x, checkBox.y, checkBox.width, checkBox.height);
+                if (selectedStops.get(i)) {
+                    sr.setColor(0.20f, 0.70f, 0.30f, 1f);
+                    sr.rect(checkBox.x + 3f, checkBox.y + 3f, checkBox.width - 6f, checkBox.height - 6f);
+                }
+                sr.end();
+
+                batch.begin();
+                font.setColor(Color.WHITE);
+                font.draw(batch, stop.getName(), checkBox.x + 24f, checkBox.y + 14f);
+                batch.end();
+            }
+
+            // Create Route button
+            long selectedCount = selectedStops.stream().filter(b -> b).count();
+            rBtnCreateRoute = new Rectangle(rPopup.x + rPopup.width - 134f, rPopup.y + 8f, 120f, 38f);
+            Color createBtnColor = selectedCount >= 2
+                ? new Color(0.20f, 0.47f, 0.80f, 1f)
+                : new Color(0.35f, 0.38f, 0.48f, 1f);
+            drawBtn(rBtnCreateRoute, "Create Route", createBtnColor);
+
+            font.getData().setScale(1.4f);
+        }
+
+        // Vehicles tab — assign routes to vehicles
+        if (activeTab == 3) {
+            List<Vehicle> vehicles = gameState.getVehicles();
+            List<Route> routes = gameState.getRoutes();
+
+            font.getData().setScale(1.0f);
+            batch.begin();
+            font.setColor(Color.WHITE);
+            font.draw(batch, "Vehicles - Click to Assign Route:", rPopup.x + 12f, rPopup.y + rPopup.height - 20f);
+            batch.end();
+
+            vehicleAssignBtns.clear();
+            float vehY = rPopup.y + rPopup.height - 52f;
+            for (int i = 0; i < vehicles.size(); i++) {
+                Vehicle v = vehicles.get(i);
+                String vehName = v.getType().toString() + " #" + (i + 1);
+                String routeInfo = v.getAssignedRoute() != null
+                    ? " (Route: " + v.getAssignedRoute().size() + " stops)"
+                    : " (No route)";
+
+                Rectangle vehBtn = new Rectangle(rPopup.x + 12f, vehY - i * 44f, rPopup.width - 38f, 38f);
+                vehicleAssignBtns.add(vehBtn);
+
+                Color vehColor = v.getAssignedRoute() != null
+                    ? new Color(0.20f, 0.60f, 0.30f, 1f)
+                    : new Color(0.60f, 0.30f, 0.20f, 1f);
+                drawBtn(vehBtn, vehName + routeInfo, vehColor);
+            }
+
+            font.getData().setScale(1.4f);
+        }
+
         // input handling — skip if another dialog is open
         if (Gdx.input.justTouched() && !showRouteAssignDialog) {
             float mx = Gdx.input.getX();
@@ -766,6 +845,68 @@ public class GameScreen implements Screen {
                                 showRouteAssignDialog = true;
                             }
                         }
+                        return;
+                    }
+                }
+            }
+
+            if (activeTab == 1) {
+                // Handle stop checkbox clicks
+                for (int i = 0; i < stopCheckboxes.size(); i++) {
+                    if (stopCheckboxes.get(i).contains(mx, my)) {
+                        selectedStops.set(i, !selectedStops.get(i));
+                        return;
+                    }
+                }
+
+                // Handle create route button
+                if (rBtnCreateRoute != null && rBtnCreateRoute.contains(mx, my)) {
+                    long selectedCount = selectedStops.stream().filter(b -> b).count();
+                    if (selectedCount >= 2) {
+                        // Collect selected stops
+                        List<StopOverlay> routeStops = new ArrayList<>();
+                        List<StopOverlay> allStops = new ArrayList<>();
+                        for (int x = 0; x < gameState.getMap().size.width; x++) {
+                            for (int y = 0; y < gameState.getMap().size.height; y++) {
+                                Tile tile = gameState.getMap().getTile(new TileCoord(x, y));
+                                if (tile != null && tile.getOverlay() instanceof StopOverlay stop) {
+                                    allStops.add(stop);
+                                }
+                            }
+                        }
+                        for (int i = 0; i < selectedStops.size() && i < allStops.size(); i++) {
+                            if (selectedStops.get(i)) {
+                                routeStops.add(allStops.get(i));
+                            }
+                        }
+
+                        // Create route
+                        Route newRoute = new Route(routeStops);
+                        gameState.addRoute(newRoute);
+                        showFeedback("Route created with " + routeStops.size() + " stops!", Color.GREEN);
+
+                        // Clear selection
+                        for (int i = 0; i < selectedStops.size(); i++) {
+                            selectedStops.set(i, false);
+                        }
+                    } else {
+                        showFeedback("Select at least 2 stops to create a route.", Color.RED);
+                    }
+                    return;
+                }
+            }
+
+            if (activeTab == 3) {
+                // Handle vehicle assignment clicks
+                for (int i = 0; i < vehicleAssignBtns.size(); i++) {
+                    if (vehicleAssignBtns.get(i).contains(mx, my) && i < gameState.getVehicles().size()) {
+                        if (gameState.getRoutes().isEmpty()) {
+                            showFeedback("No routes available. Create a route first.", Color.RED);
+                            return;
+                        }
+                        pendingVehicle = gameState.getVehicles().get(i);
+                        pendingVehicleName = pendingVehicle.getType().toString();
+                        showRouteAssignDialog = true;
                         return;
                     }
                 }

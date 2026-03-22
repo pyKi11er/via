@@ -219,8 +219,8 @@ public class WorldMapRenderer {
         int dy = pos.getDestination().y - pos.getOrigin().y;
         if (dx > 0) return Direction.E;
         if (dx < 0) return Direction.W;
-        if (dy > 0) return Direction.S;
-        return Direction.N;
+        if (dy > 0) return Direction.N;  // Higher Y = North (up)
+        return Direction.S;  // Lower Y = South (down)
     }
 
     private void draw(TextureRegion r, float x, float y) {

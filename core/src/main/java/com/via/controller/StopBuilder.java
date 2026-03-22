@@ -33,16 +33,16 @@ public class StopBuilder {
             .anyMatch(t -> t != null && t.getStructure() instanceof Road);
     }
 
-    public StopOverlay placeStop(String name, TileCoord coord, StopAccess access, Storage storage) {
-        if (coord == null || access == null || storage == null || economy == null) return null;
+    public boolean placeStop(String name, TileCoord coord, StopAccess access, Storage storage) {
+        if (coord == null || access == null || storage == null || economy == null) return false;
 
-        if (!canPlaceStopAt(coord)) return null;
+        if (!canPlaceStopAt(coord)) return false;
 
-        if (economy.getCapital() < baseCost) return null;
+        if (economy.getCapital() < baseCost) return false;
 
         economy.deduct(baseCost);
-        StopOverlay stop = new StopOverlay(name, coord, access, storage);
-        map.getTile(coord).setOverlay(stop);
-        return stop;
+        Tile tile = map.getTile(coord);
+        tile.setOverlay(new StopOverlay(name, coord, access, storage));
+        return true;
     }
 }

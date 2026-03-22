@@ -25,6 +25,10 @@ public class Route {
         return Collections.unmodifiableList(stops);
     }
 
+    public void addStop(StopOverlay stop) {
+        if (stop != null) stops.add(stop);
+    }
+
     public int size() {
         return stops.size();
     }

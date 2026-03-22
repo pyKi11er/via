@@ -74,12 +74,14 @@ public class MapInitializer {
         VehiclePosition truckPos = new VehiclePosition(
             new TileCoord(3, ROAD_Y), new TileCoord(4, ROAD_Y));
         SmallTruck truck = new SmallTruck(truckPos);
+        truck.onPurchased(0);
         truck.assignRoute(route);
         state.addVehicle(truck);
 
         VehiclePosition busPos = new VehiclePosition(
             new TileCoord(11, ROAD_Y), new TileCoord(12, ROAD_Y));
         MidiBus bus = new MidiBus(busPos);
+        bus.onPurchased(0);
         bus.assignRoute(route);
         state.addVehicle(bus);
 

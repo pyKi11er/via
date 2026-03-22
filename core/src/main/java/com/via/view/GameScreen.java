@@ -26,6 +26,7 @@ import com.via.model.building.Facility;
 import com.via.model.building.Garage;
 import com.via.model.building.Road;
 import com.via.model.building.StopAccess;
+import com.via.model.building.StopOverlay;
 import com.via.model.economy.Storage;
 import com.via.model.map.Structure;
 import com.via.model.map.Terrain;
@@ -283,7 +284,7 @@ public class GameScreen implements Screen {
         if (Gdx.input.isButtonPressed(Input.Buttons.RIGHT))
             mapCamera.translate(-Gdx.input.getDeltaX(), Gdx.input.getDeltaY());
 
-        if (!Gdx.input.justTouched()) return;
+        if (!Gdx.input.isButtonJustPressed(Input.Buttons.LEFT)) return;
 
         float mx = Gdx.input.getX();
         float myHud = Gdx.graphics.getHeight() - Gdx.input.getY(); // flipped Y for HUD
@@ -353,7 +354,9 @@ public class GameScreen implements Screen {
             }
             StopAccess access = new StopAccess(AccessType.ROAD_TILE, coord, Direction.N);
             String name = "Stop " + playerStopSequence++;
-            if (stopBuilder.placeStop(name, coord, access, new Storage())) {
+            StopOverlay placed = stopBuilder.placeStop(name, coord, access, new Storage());
+            if (placed != null) {
+                gameState.getRoutes().forEach(r -> r.addStop(placed));
                 showFeedback("Stop built: " + name, Color.GREEN);
             } else {
                 showFeedback("Could not place stop.", Color.RED);
@@ -363,12 +366,20 @@ public class GameScreen implements Screen {
         if (activeBuildOption == 2) { showFeedback("Garage placement coming soon.", Color.YELLOW); return; }
         if (activeBuildOption == 3) { showFeedback("Terraform coming soon.", Color.YELLOW); return; }
 
-        // no build mode active — just print tile info to console
-        Tile tile = gameState.getMap().getTile(coord);
-        if (tile != null) {
-            System.out.println("Tile [" + tileX + "," + tileY + "]"
-                + " terrain=" + tile.getTerrain().getType()
-                + " structure=" + (tile.getStructure() == null ? "null" : tile.getStructure().getClass().getSimpleName()));
+        // no build mode active — check for vehicle click
+        Vehicle clicked = vehicleAtTile(coord);
+        if (clicked != null) {
+            if (gameState.getRoutes().isEmpty()) {
+                showFeedback("No routes exist yet.", Color.YELLOW);
+            } else {
+                pendingVehicle = clicked;
+                pendingVehicleName = GameController.VEHICLE_CATALOG.stream()
+                    .filter(e -> e.type() == clicked.getType())
+                    .map(GameController.VehicleCatalogEntry::displayName)
+                    .findFirst().orElse(clicked.getType().name());
+                showRouteAssignDialog = true;
+            }
+            return;
         }
     }
 
@@ -585,6 +596,14 @@ public class GameScreen implements Screen {
 
     private static float mmLerp(float a, float b, float t) {
         return a + (b - a) * t;
+    }
+
+    private Vehicle vehicleAtTile(TileCoord coord) {
+        for (Vehicle v : gameState.getVehicles()) {
+            if (v.getPosition() != null && v.getPosition().getOrigin().equals(coord))
+                return v;
+        }
+        return null;
     }
 
     private void drawPopup() {

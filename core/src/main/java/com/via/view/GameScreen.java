@@ -21,8 +21,14 @@ import com.via.controller.RoadBuilder;
 import com.via.controller.StopBuilder;
 import com.via.model.Constants;
 import com.via.model.GameState;
+import com.via.model.building.City;
+import com.via.model.building.Facility;
+import com.via.model.building.Garage;
+import com.via.model.building.Road;
 import com.via.model.building.StopAccess;
 import com.via.model.economy.Storage;
+import com.via.model.map.Structure;
+import com.via.model.map.Terrain;
 import com.via.model.enums.AccessType;
 import com.via.model.enums.Direction;
 import com.via.model.enums.SpeedSetting;
@@ -87,6 +93,9 @@ public class GameScreen implements Screen {
     private final Rectangle[] buildOptions = new Rectangle[4];
     private final String[] buildLabels = {"Road", "Stop", "Garage", "Terraform"};
     private int activeBuildOption = -1;
+
+    // minimap content bounds (lazy-computed once, 0 = not yet computed)
+    private int minimapContentW = 0, minimapContentH = 0;
 
     // buy popup — one button per catalog entry
     private final Rectangle[] buyBtns = new Rectangle[GameController.VEHICLE_CATALOG.size()];
@@ -301,6 +310,18 @@ public class GameScreen implements Screen {
             }
         }
 
+        // minimap click — scroll main camera to clicked world position
+        float mmX = mmX(), mmY = mmY();
+        if (mx >= mmX && mx <= mmX + MM_SIZE && myHud >= mmY && myHud <= mmY + MM_SIZE) {
+            ensureMinimapBounds();
+            float scaleX = MM_SIZE / (minimapContentW * Constants.TILE_SIZE);
+            float scaleY = MM_SIZE / (minimapContentH * Constants.TILE_SIZE);
+            float worldX = (mx   - mmX) / scaleX;
+            float worldY = (myHud - mmY) / scaleY;
+            mapCamera.position.set(worldX, worldY, 0);
+            return;
+        }
+
         // map click — convert screen coords to tile coords
         Vector3 world = new Vector3(mx, myRaw, 0);
         mapCamera.unproject(world);
@@ -450,26 +471,120 @@ public class GameScreen implements Screen {
         batch.end();
     }
 
-    private void drawMinimap() {
-        float w = Gdx.graphics.getWidth();
-        float size = 160f;
-        float x = w - size - 10f, y = BOT_BAR_H + 10f;
+    private static final float MM_SIZE = 240f;
 
+    /** Returns the minimap x origin for the current screen width. */
+    private float mmX() { return Gdx.graphics.getWidth() - MM_SIZE - 10f; }
+    private float mmY() { return BOT_BAR_H + 10f; }
+
+    /** Scans for the max x/y of non-null tiles; result cached after first call. */
+    private void ensureMinimapBounds() {
+        if (minimapContentW > 0) return;
+        com.via.model.map.Map map = gameState.getMap();
+        for (int x = 0; x < map.size.width; x++) {
+            for (int y = 0; y < map.size.height; y++) {
+                if (map.getTile(new TileCoord(x, y)) != null) {
+                    if (x + 1 > minimapContentW) minimapContentW = x + 1;
+                    if (y + 1 > minimapContentH) minimapContentH = y + 1;
+                }
+            }
+        }
+        if (minimapContentW == 0) minimapContentW = map.size.width;
+        if (minimapContentH == 0) minimapContentH = map.size.height;
+    }
+
+    private void drawMinimap() {
+        ensureMinimapBounds();
+        float mmX = mmX(), mmY = mmY();
+        com.via.model.map.Map map = gameState.getMap();
+        int mapW = map.size.width;
+        int mapH = map.size.height;
+
+        // scale: world pixel -> minimap pixel, based on actual initialized area
+        float scaleX = MM_SIZE / (minimapContentW * Constants.TILE_SIZE);
+        float scaleY = MM_SIZE / (minimapContentH * Constants.TILE_SIZE);
+        float tileW  = Constants.TILE_SIZE * scaleX;
+        float tileH  = Constants.TILE_SIZE * scaleY;
+
+        Gdx.gl.glEnable(GL20.GL_BLEND);
+        Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
+
+        // --- tiles + vehicles in one Filled pass ---
         sr.begin(ShapeRenderer.ShapeType.Filled);
+
+        // background
         sr.setColor(0.07f, 0.10f, 0.17f, 1f);
-        sr.rect(x, y, size, size);
+        sr.rect(mmX, mmY, MM_SIZE, MM_SIZE);
+
+        // tiles
+        for (int x = 0; x < mapW; x++) {
+            for (int y = 0; y < mapH; y++) {
+                Tile tile = map.getTile(new TileCoord(x, y));
+                if (tile == null) continue;
+                sr.setColor(minimapTileColor(tile));
+                sr.rect(mmX + x * tileW, mmY + y * tileH, tileW, tileH);
+            }
+        }
+
+        // vehicles as 3×3 dots
+        for (Vehicle v : gameState.getVehicles()) {
+            if (v.getPosition() == null) continue;
+            float wx = mmLerp(v.getPosition().getOrigin().x,
+                              v.getPosition().getDestination().x,
+                              v.getPosition().getProgress()) * Constants.TILE_SIZE;
+            float wy = mmLerp(v.getPosition().getOrigin().y,
+                              v.getPosition().getDestination().y,
+                              v.getPosition().getProgress()) * Constants.TILE_SIZE;
+            float px = mmX + wx * scaleX;
+            float py = mmY + wy * scaleY;
+            boolean isBus = switch (v.getType()) {
+                case BUS, CITY_BUS, EXPRESS_BUS -> true;
+                default -> false;
+            };
+            sr.setColor(isBus ? new Color(0.20f, 0.65f, 0.95f, 1f)
+                              : new Color(0.95f, 0.65f, 0.10f, 1f));
+            sr.rect(px - 1.5f, py - 1.5f, 3f, 3f);
+        }
+
+        // viewport rect — clamped to minimap bounds
+        float vpX  = mmX + (mapCamera.position.x - mapCamera.viewportWidth  / 2f) * scaleX;
+        float vpY  = mmY + (mapCamera.position.y - mapCamera.viewportHeight / 2f) * scaleY;
+        float vpX2 = vpX + mapCamera.viewportWidth  * scaleX;
+        float vpY2 = vpY + mapCamera.viewportHeight * scaleY;
+        float cvX  = Math.max(mmX, vpX);
+        float cvY  = Math.max(mmY, vpY);
+        float cvW  = Math.max(0, Math.min(mmX + MM_SIZE, vpX2) - cvX);
+        float cvH  = Math.max(0, Math.min(mmY + MM_SIZE, vpY2) - cvY);
+        sr.setColor(1f, 1f, 1f, 0.10f);
+        sr.rect(cvX, cvY, cvW, cvH);
+
         sr.end();
 
+        // --- border + viewport outline in Line pass ---
         sr.begin(ShapeRenderer.ShapeType.Line);
         sr.setColor(0.20f, 0.47f, 0.80f, 1f);
-        sr.rect(x, y, size, size);
+        sr.rect(mmX, mmY, MM_SIZE, MM_SIZE);
+        sr.setColor(1f, 1f, 1f, 0.85f);
+        sr.rect(cvX, cvY, cvW, cvH);
         sr.end();
 
-        batch.begin();
-        font.setColor(Color.WHITE);
-        gl.setText(font, "Minimap");
-        font.draw(batch, "Minimap", x + (size - gl.width) / 2f, y + (size + gl.height) / 2f);
-        batch.end();
+        Gdx.gl.glDisable(GL20.GL_BLEND);
+    }
+
+    private Color minimapTileColor(Tile tile) {
+        Structure s = tile.getStructure();
+        if (s instanceof Road)     return new Color(0.52f, 0.52f, 0.52f, 1f);
+        if (s instanceof City)     return new Color(0.90f, 0.85f, 0.50f, 1f);
+        if (s instanceof Facility) return new Color(0.75f, 0.40f, 0.18f, 1f);
+        if (s instanceof Garage)   return new Color(0.48f, 0.48f, 0.78f, 1f);
+        if (tile.getOverlay() != null) return new Color(1.0f, 0.90f, 0.15f, 1f);
+        Terrain t = tile.getTerrain();
+        if (t.hasForest()) return new Color(0.08f, 0.36f, 0.08f, 1f);
+        return new Color(0.22f, 0.58f, 0.22f, 1f);
+    }
+
+    private static float mmLerp(float a, float b, float t) {
+        return a + (b - a) * t;
     }
 
     private void drawPopup() {

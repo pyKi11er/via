@@ -24,7 +24,7 @@ import com.via.model.vehicle.VehiclePosition;
 public class MainMenuScreen extends InputAdapter implements Screen {
     private final VIA game;
 
-    // ── UI camera / rendering ──────────────────────────────────────────────
+    // ── UI camera / rendering
     private final OrthographicCamera camera;
     private final ShapeRenderer shapeRenderer;
     private final BitmapFont buttonFont;
@@ -33,7 +33,7 @@ public class MainMenuScreen extends InputAdapter implements Screen {
     private final Texture texButton;
     private final Texture texPanel;
 
-    // ── Background simulation ──────────────────────────────────────────────
+    // ── Background simulation
     private final GameState          bgState;
     private final GameEngine         bgEngine;
     private final WorldMapRenderer   bgRenderer;
@@ -47,7 +47,7 @@ public class MainMenuScreen extends InputAdapter implements Screen {
     private static final float MAP_PX_W   = 40 * (float) Constants.TILE_SIZE;
     private static final float MAP_PX_H   = 30 * (float) Constants.TILE_SIZE;
 
-    // ── Dialog state ───────────────────────────────────────────────────────
+    // ── Dialog state
     private enum Dialog { NONE, NEW_GAME, LOAD_GAME, ABOUT, HELP, EXIT, SETTINGS }
     private Dialog dialog = Dialog.NONE;
 
@@ -58,24 +58,24 @@ public class MainMenuScreen extends InputAdapter implements Screen {
     private String  playerName  = "Player";
     private String  tycoonName  = "Tycoon";
 
-    // ── Screen dimensions ──────────────────────────────────────────────────
+    // ── Screen dimensions
     private float width;
     private float height;
     private float panelW;
 
-    // ── Hit rectangles ─────────────────────────────────────────────────────
+    // ── Hit rectangles
     private Rectangle rLogo;
     private Rectangle rNew, rLoad, rAbout, rSettings, rHelp, rExit;
     private Rectangle rDialog, rField1, rField2, rDlgBtn1, rDlgBtn2, rDlgClose;
 
-    // ── Button accent colors ───────────────────────────────────────────────
+    // ── Button accent colors
     private static final Color COL_NEW      = new Color(0.18f, 0.75f, 0.40f, 1f);
     private static final Color COL_LOAD     = new Color(0.25f, 0.55f, 0.92f, 1f);
     private static final Color COL_SETTINGS = new Color(0.52f, 0.58f, 0.74f, 1f);
     private static final Color COL_HELP     = new Color(0.88f, 0.66f, 0.14f, 1f);
     private static final Color COL_EXIT     = new Color(0.82f, 0.22f, 0.22f, 1f);
 
-    // ── Panel / dialog colors ──────────────────────────────────────────────
+    // ── Panel / dialog colors
     private static final Color PANEL_DARK   = new Color(0.04f, 0.07f, 0.13f, 0.94f);
     private static final Color PANEL_BORDER = new Color(0.22f, 0.35f, 0.62f, 0.70f);
 
@@ -86,10 +86,10 @@ public class MainMenuScreen extends InputAdapter implements Screen {
     private static final Color DLG_HEADER_SETTINGS = new Color(0.28f, 0.34f, 0.50f, 1f);
     private static final Color DLG_HEADER_EXIT     = new Color(0.55f, 0.14f, 0.14f, 1f);
 
-    // ── Textures (logo only — button/panel kept for dialogs) ──────────────
+    // ── Textures (logo only — button/panel kept for dialogs)
     private final Texture texLogo;
 
-    // ──────────────────────────────────────────────────────────────────────
+    //
 
     public MainMenuScreen(VIA game) {
         this.game = game;
@@ -134,7 +134,7 @@ public class MainMenuScreen extends InputAdapter implements Screen {
         this.bgCamY = MAP_PX_H * 0.50f;
     }
 
-    // ──────────────────────────────────────────────────────────────────────
+    //
 
     @Override
     public void show() {
@@ -202,24 +202,23 @@ public class MainMenuScreen extends InputAdapter implements Screen {
         rDlgClose = new Rectangle(dlgX + dlgW * 0.5f - bW * 0.5f,  bY, bW, bH);
     }
 
-    // ──────────────────────────────────────────────────────────────────────
 
     @Override
     public void render(float delta) {
         Gdx.gl.glClearColor(0f, 0f, 0f, 1f);
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
 
-        // ── 1. Advance and render background simulation ──────────────────
+
         bgEngine.update();
         panBgCamera(delta);
-        bgRenderer.render(bgState);   // sets game.batch projection to bgCamera
+        bgRenderer.render(bgState);
 
         // Restore UI camera on both renderers
         camera.update();
         shapeRenderer.setProjectionMatrix(camera.combined);
         game.batch.setProjectionMatrix(camera.combined);
 
-        // ── 2. Dim the world to improve UI contrast ──────────────────────
+
         blend(() -> {
             shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
             shapeRenderer.setColor(0f, 0f, 0f, 0.48f);
@@ -227,7 +226,7 @@ public class MainMenuScreen extends InputAdapter implements Screen {
             shapeRenderer.end();
         });
 
-        // ── 3. Left sidebar panel ────────────────────────────────────────
+        // Left sidebar panel
         blend(() -> {
             shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
             shapeRenderer.setColor(PANEL_DARK);
@@ -240,13 +239,13 @@ public class MainMenuScreen extends InputAdapter implements Screen {
             shapeRenderer.end();
         });
 
-        // ── 4. Logo ──────────────────────────────────────────────────────
+        // Logo
         game.batch.begin();
         game.batch.setColor(Color.WHITE);
         game.batch.draw(texLogo, rLogo.x, rLogo.y, rLogo.width, rLogo.height);
         game.batch.end();
 
-        // ── 5. Subtitle + separator ──────────────────────────────────────
+        //  Subtitle + separator
         float subtitleY = rLogo.y - height * 0.022f;
         drawCentered(smallFont, "Mini Transport Tycoon", panelW * 0.5f, subtitleY,
                 new Color(0.68f, 0.78f, 1.0f, 0.80f));
@@ -260,25 +259,25 @@ public class MainMenuScreen extends InputAdapter implements Screen {
             shapeRenderer.end();
         });
 
-        // ── 6. Menu buttons ──────────────────────────────────────────────
+        //  Menu buttons
         drawMenuButton(rNew,      "New Game",  COL_NEW);
         drawMenuButton(rLoad,     "Load Game", COL_LOAD);
         drawMenuButton(rSettings, "Settings",  COL_SETTINGS);
         drawMenuButton(rHelp,     "Help",      COL_HELP);
         drawMenuButton(rExit,     "Exit",      COL_EXIT);
 
-        // ── 7. About footer link ─────────────────────────────────────────
+        // About footer link
         boolean aboutHover = isHovered(rAbout);
         drawCentered(smallFont, "About", panelW * 0.5f,
                 rAbout.y + rAbout.height * 0.78f,
                 aboutHover ? new Color(0.80f, 0.86f, 1.0f, 0.95f)
                            : new Color(0.48f, 0.58f, 0.80f, 0.60f));
 
-        // ── 8. Dialog ────────────────────────────────────────────────────
+        // Dialog
         if (dialog != Dialog.NONE) renderDialog();
     }
 
-    // ── Background camera follow ───────────────────────────────────────────
+    // Background camera follow
 
     private void panBgCamera(float delta) {
         // Switch to a different vehicle whenever the current one is stationary (origin == destination)
@@ -306,8 +305,6 @@ public class MainMenuScreen extends InputAdapter implements Screen {
             bgCamY = vy;
         }
 
-        // Only clamp Y — X is intentionally unclamped so the vehicle stays visible
-        // even near the left map edge (the renderer fills empty space with grass).
         float halfVH = bgCamera.viewportHeight * 0.5f;
         bgCamY = Math.max(halfVH, Math.min(MAP_PX_H - halfVH, bgCamY));
 
@@ -328,7 +325,7 @@ public class MainMenuScreen extends InputAdapter implements Screen {
         return a + (b - a) * t;
     }
 
-    // ── Drawing helpers ───────────────────────────────────────────────────
+    // Drawing helpers
 
     /** Sidebar button with a colored left-accent bar. */
     private void drawMenuButton(Rectangle r, String label, Color accent) {
@@ -372,7 +369,7 @@ public class MainMenuScreen extends InputAdapter implements Screen {
         drawShadow(buttonFont, label, tx, ty, Color.WHITE);
     }
 
-    // ── Dialog rendering ──────────────────────────────────────────────────
+    // Dialog rendering
 
     private void renderDialog() {
         blend(() -> {
@@ -573,7 +570,7 @@ public class MainMenuScreen extends InputAdapter implements Screen {
         return r != null && r.contains(Gdx.input.getX(), height - Gdx.input.getY());
     }
 
-    // ── Input ─────────────────────────────────────────────────────────────
+    // Input
 
     @Override
     public boolean keyDown(int keycode) {
@@ -652,7 +649,7 @@ public class MainMenuScreen extends InputAdapter implements Screen {
         game.setScreen(new GameScreen(game, MapInitializer.createNewGame()));
     }
 
-    // ── Screen lifecycle ──────────────────────────────────────────────────
+    // Screen lifecycle
 
     @Override public void pause()  {}
     @Override public void resume() {}

@@ -11,10 +11,15 @@ build:
   artifacts:
     paths:
       - lwjgl3/build/
+      - core/build/
 
 test:
   stage: test
   image: eclipse-temurin:17-jdk
   script:
     - chmod +x gradlew
-    - ./gradlew test
+    - ./gradlew core:test
+  artifacts:
+    when: always
+    reports:
+      junit: core/build/test-results/test/**/TEST-*.xml # Displays test results in GitLab UI

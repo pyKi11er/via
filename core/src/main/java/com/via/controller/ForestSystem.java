@@ -8,8 +8,8 @@ import java.util.Random;
 import java.util.Set;
 
 public class ForestSystem {
-    private static final float DEFAULT_GROWTH_PROBABILITY = 0.02f;
-    private static final float DEFAULT_SPREAD_PROBABILITY = 0.01f;
+    private static final float DEFAULT_GROWTH_PROBABILITY = 0.002f;
+    private static final float DEFAULT_SPREAD_PROBABILITY = 0.001f;
 
     private final float growthProbability;
     private final float spreadProbability;

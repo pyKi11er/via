@@ -61,10 +61,10 @@ public class WorldMapRenderer {
         texSlopeS = load("terrain/slope_s.png", fallbackTiles[0][2]);
         texSlopeE = load("terrain/slope_e.png", fallbackTiles[0][2]);
         texSlopeW = load("terrain/slope_w.png", fallbackTiles[0][2]);
-        texForest[0] = load("terrain/forest_1.png", fallbackTiles[0][0]);
-        texForest[1] = load("terrain/forest_2.png", fallbackTiles[0][0]);
-        texForest[2] = load("terrain/forest_3.png", fallbackTiles[0][0]);
-        texForest[3] = load("terrain/forest_4.png", fallbackTiles[0][0]);
+        texForest[0] = load("terrain/forest_1.jpg", fallbackTiles[0][0]);
+        texForest[1] = load("terrain/forest_2.jpg", fallbackTiles[0][0]);
+        texForest[2] = load("terrain/forest_3.jpg", fallbackTiles[0][0]);
+        texForest[3] = load("terrain/forest_4.jpg", fallbackTiles[0][0]);
 
         texCityTile     = load("buildings/city_tile.png",     fallbackTiles[2][0]);
         texFacilityTile = load("buildings/facility_tile.png", fallbackTiles[3][4]);
@@ -130,9 +130,19 @@ public class WorldMapRenderer {
 
         for (float x = camX - TILE_SIZE; x < camX + camW + TILE_SIZE; x += TILE_SIZE) {
             for (float y = camY - TILE_SIZE; y < camY + camH + TILE_SIZE; y += TILE_SIZE) {
-                draw(texGrass,
-                    (float)(Math.floor(x / TILE_SIZE) * TILE_SIZE),
-                    (float)(Math.floor(y / TILE_SIZE) * TILE_SIZE));
+                float tx = (float)(Math.floor(x / TILE_SIZE) * TILE_SIZE);
+                float ty = (float)(Math.floor(y / TILE_SIZE) * TILE_SIZE);
+
+                // Check if this screen position corresponds to a map tile
+                int tileX = (int)(tx / TILE_SIZE);
+                int tileY = (int)(ty / TILE_SIZE);
+                TileCoord coord = new TileCoord(tileX, tileY);
+
+                if (state.getMap().isWithinBounds(coord)) {
+                    draw(texGrass, tx, ty);
+                } else {
+                    draw(texForest[3], tx, ty);
+                }
             }
         }
 
@@ -140,7 +150,6 @@ public class WorldMapRenderer {
         renderVehicles(state.getVehicles());
         batch.end();
     }
-
     private void renderTiles(Map map) {
         for (int x = 0; x < map.size.width; x++) {
             for (int y = 0; y < map.size.height; y++) {

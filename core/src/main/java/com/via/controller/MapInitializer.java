@@ -40,6 +40,8 @@ public class MapInitializer {
 
         GameState state = new GameState(map);
 
+        seedForests(map);
+
         // 2. Place buildings
         buildMine(map, state);
         buildForestCamp(map, state);
@@ -164,5 +166,23 @@ public class MapInitializer {
         StopOverlay stop = new StopOverlay(name, coord, access, storage);
         tile.setOverlay(stop);
         return stop;
+    }
+
+    private static void seedForests(Map map) {
+        int[][] seeds = {
+            {1, 25, 2}, {2, 25, 1}, {1, 26, 1}, {2, 26, 3}, {3, 26, 1},
+            {14, 27, 3}, {15, 27, 2}, {15, 28, 1}, {16, 27, 1}, {14, 28, 2},
+            {35, 22, 2}, {36, 22, 1}, {35, 23, 3}, {36, 23, 2}, {37, 23, 1},
+            {39, 2, 1}, {39, 1, 1}, {38, 2, 2}, {38, 1, 1}, {38, 2, 1},
+            {9, 5, 1}, {9, 4, 1}, {8, 5, 2}, {8, 4, 1}, {8, 3, 1},
+        };
+
+        for (int[] seed : seeds) {
+            TileCoord coord = new TileCoord(seed[0], seed[1]);
+            if (!map.isWithinBounds(coord)) continue;
+            Tile tile = map.getTile(coord);
+            if (tile == null || tile.getTerrain() == null) continue;
+            tile.getTerrain().setForestLevel(seed[2]);
+        }
     }
 }

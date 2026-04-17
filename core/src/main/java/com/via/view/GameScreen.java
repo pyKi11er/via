@@ -430,9 +430,14 @@ public class GameScreen implements Screen {
                 case 1 -> Constants.STOP_PLACEMENT_COST;
                 default -> 0;
             };
+            if (activeBuildOption == 0 && hoveredTile != null) {
+                modeCost = gameState.getMap().getRoadBuildCost(hoveredTile, 100, 50);
+            }
+
             String modeLabel = modeCost > 0
                 ? "Mode: " + buildLabels[activeBuildOption] + "  [cost: $" + modeCost + "]"
                 : "Mode: " + buildLabels[activeBuildOption];
+
             gl.setText(font, modeLabel);
             batch.begin();
             font.setColor(1.0f, 0.85f, 0.20f, 1f);

@@ -622,6 +622,13 @@ public class GameScreen implements Screen {
         return a + (b - a) * t;
     }
 
+    private boolean playerOwnsGarage() {
+        for (Building b : gameState.getBuildings()) {
+            if (b instanceof Garage) return true;
+        }
+        return false;
+    }
+
     private void drawPopup() {
         // popup size varies by tab; Buy tab is taller and wider
         boolean isBuyTab = (activeTab == 2);
@@ -834,8 +841,10 @@ public class GameScreen implements Screen {
             font.setColor(new Color(0.70f, 0.80f, 1.0f, 1f));
             font.draw(batch, "Vehicles", rPopup.x + 12f, rPopup.y + rPopup.height - 36f);
             font.setColor(new Color(0.50f, 0.55f, 0.65f, 1f));
-            font.draw(batch, vehicles.size() + " total  —  click a row to assign route or sell manually",
-                rPopup.x + 90f, rPopup.y + rPopup.height - 36f);
+            String subText = playerOwnsGarage()
+                ? vehicles.size() + " total  —  click a row to assign route or sell manually"
+                : vehicles.size() + " total  —  (Build a garage to sell vehicles)";
+            font.draw(batch, subText, rPopup.x + 90f, rPopup.y + rPopup.height - 36f);
             batch.end();
 
             vehicleAssignBtns.clear();
@@ -868,9 +877,17 @@ public class GameScreen implements Screen {
                     .filter(e -> e.type() == v.getType())
                     .map(GameController.VehicleCatalogEntry::displayName)
                     .findFirst().orElse(v.getType().toString());
-                String routeInfo = hasRoute
-                    ? v.getAssignedRoute().size() + " stops"
-                    : "No route";
+
+                String routeInfo;
+                if (v.isReturningToGarage()) {
+                    routeInfo = "En route to Garage";
+                } else if (v.isMaintaining()) {
+                    routeInfo = "Maintaining...";
+                } else if (hasRoute) {
+                    routeInfo = v.getAssignedRoute().size() + " stops";
+                } else {
+                    routeInfo = "No route";
+                }
 
                 batch.begin();
                 font.setColor(Color.WHITE);
@@ -884,9 +901,11 @@ public class GameScreen implements Screen {
                 vehicleAssignBtns.add(assignBtn);
 
                 // Button for manual selling
-                Rectangle sellBtn = new Rectangle(rPopup.x + rPopup.width - 86f, rowY + 4f, 70f, rowH - 8f);
-                vehicleSellBtns.add(sellBtn);
-                drawBtn(sellBtn, "Sell", new Color(0.65f, 0.25f, 0.25f, 1f));
+                if (playerOwnsGarage()) {
+                    Rectangle sellBtn = new Rectangle(rPopup.x + rPopup.width - 86f, rowY + 4f, 70f, rowH - 8f);
+                    vehicleSellBtns.add(sellBtn);
+                    drawBtn(sellBtn, "Sell", new Color(0.65f, 0.25f, 0.25f, 1f));
+                }
             }
 
             if (vehicles.isEmpty()) {

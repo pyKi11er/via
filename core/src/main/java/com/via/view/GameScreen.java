@@ -125,6 +125,12 @@ public class GameScreen implements Screen {
     private TileCoord hoveredTile = null;
     private TileCoord lastDragTile = null;
 
+    // Garage Detail UI
+    private boolean showGarageDetailDialog = false;
+    private Garage selectedGarageForDetails = null;
+    private Rectangle rGarageDetailClose;
+    private final List<Rectangle> garageDetailSellBtns = new ArrayList<>();
+
     public GameScreen(VIA game, GameState gameState) {
         this.game = game;
         this.gameState = gameState;
@@ -232,7 +238,7 @@ public class GameScreen implements Screen {
         if (showPopup) drawPopup();
         if (showExitDialog) drawExitDialog();
         if (showRouteAssignDialog) drawRouteAssignDialog();
-
+        if (showGarageDetailDialog) drawGarageDetailDialog();
         drawFeedback();
     }
 
@@ -413,6 +419,15 @@ public class GameScreen implements Screen {
                 showFeedback("Click on a Garage to demolish it.", Color.RED);
             }
             return;
+        }
+        // If no build mode is active, check if they clicked a Garage
+        if (activeBuildOption == -1) {
+            Tile tile = gameState.getMap().getTile(coord);
+            if (tile != null && tile.getStructure() instanceof Garage clickedGarage) {
+                selectedGarageForDetails = clickedGarage;
+                showGarageDetailDialog = true;
+                return;
+            }
         }
         // no build mode active — just print tile info to console
         Tile tile = gameState.getMap().getTile(coord);
@@ -1213,6 +1228,132 @@ public class GameScreen implements Screen {
                     showRouteAssignDialog = false;
                     pendingVehicle = null;
                     return;
+                }
+            }
+        }
+    }
+
+    private void drawGarageDetailDialog() {
+        if (selectedGarageForDetails == null) return;
+
+        // 1. Filter vehicles belonging to this garage
+        List<Vehicle> parkedVehicles = gameState.getVehicles().stream()
+            .filter(v -> v.getHomeGarageLocation() != null &&
+                v.getHomeGarageLocation().equals(selectedGarageForDetails.getLocation()))
+            .toList();
+
+        float w = Gdx.graphics.getWidth();
+        float h = Gdx.graphics.getHeight();
+
+        float dW = 500f;
+        float dH = Math.max(200f, 100f + parkedVehicles.size() * 40f);
+        float dX = w / 2f - dW / 2f;
+        float dY = h / 2f - dH / 2f;
+        Rectangle rDialog = new Rectangle(dX, dY, dW, dH);
+
+        rGarageDetailClose = new Rectangle(dX + dW - 30f, dY + dH - 30f, 24f, 24f);
+
+        // Dim background overlay
+        Gdx.gl.glEnable(GL20.GL_BLEND);
+        Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
+        sr.begin(ShapeRenderer.ShapeType.Filled);
+        sr.setColor(0f, 0f, 0f, 0.68f);
+        sr.rect(0, 0, w, h);
+
+        // Dialog Box
+        sr.setColor(0.07f, 0.10f, 0.17f, 0.97f);
+        sr.rect(rDialog.x, rDialog.y, rDialog.width, rDialog.height);
+
+        // Top accent stripe
+        sr.setColor(0.20f, 0.47f, 0.80f, 1f);
+        sr.rect(rDialog.x, rDialog.y + rDialog.height - 4f, rDialog.width, 4f);
+
+        // Close button
+        sr.setColor(0.60f, 0.15f, 0.15f, 1f);
+        sr.rect(rGarageDetailClose.x, rGarageDetailClose.y, rGarageDetailClose.width, rGarageDetailClose.height);
+        sr.end();
+        Gdx.gl.glDisable(GL20.GL_BLEND);
+
+        // Text rendering
+        batch.begin();
+        font.setColor(Color.WHITE);
+        gl.setText(font, "X");
+        font.draw(batch, "X", rGarageDetailClose.x + (rGarageDetailClose.width - gl.width) / 2f,
+            rGarageDetailClose.y + (rGarageDetailClose.height + gl.height) / 2f);
+
+        // Header
+        font.getData().setScale(1.2f);
+        font.setColor(new Color(0.70f, 0.80f, 1.0f, 1f));
+        font.draw(batch, "Garage Details", dX + 16f, dY + dH - 16f);
+
+        // Capacity indicator
+        font.getData().setScale(1.0f);
+        Color capColor = parkedVehicles.size() >= Constants.GARAGE_CAPACITY ? new Color(0.9f, 0.4f, 0.4f, 1f) : new Color(0.50f, 0.90f, 0.55f, 1f);
+        font.setColor(capColor);
+        font.draw(batch, "Capacity: " + parkedVehicles.size() + " / " + Constants.GARAGE_CAPACITY, dX + 16f, dY + dH - 40f);
+        batch.end();
+
+        garageDetailSellBtns.clear();
+        float rowY = dY + dH - 85f;
+
+        // Draw Vehicles
+        for (int i = 0; i < parkedVehicles.size(); i++) {
+            Vehicle v = parkedVehicles.get(i);
+
+            sr.begin(ShapeRenderer.ShapeType.Filled);
+            sr.setColor(i % 2 == 0 ? new Color(0.12f, 0.16f, 0.24f, 1f) : new Color(0.15f, 0.19f, 0.29f, 1f));
+            sr.rect(dX + 16f, rowY, dW - 32f, 34f);
+            sr.end();
+
+            String displayName = GameController.VEHICLE_CATALOG.stream()
+                .filter(e -> e.type() == v.getType())
+                .map(GameController.VehicleCatalogEntry::displayName)
+                .findFirst().orElse(v.getType().toString());
+
+            batch.begin();
+            font.setColor(Color.WHITE);
+            font.draw(batch, displayName, dX + 24f, rowY + 22f);
+
+            String status = v.isMaintaining() ? "Maintaining..." : (v.isReturningToGarage() ? "Returning..." : "On Route");
+            font.setColor(new Color(0.7f, 0.7f, 0.7f, 1f));
+            font.draw(batch, status, dX + 160f, rowY + 22f);
+            batch.end();
+
+            Rectangle sellBtn = new Rectangle(dX + dW - 100f, rowY + 4f, 70f, 26f);
+            garageDetailSellBtns.add(sellBtn);
+            drawBtn(sellBtn, "Sell", new Color(0.65f, 0.25f, 0.25f, 1f));
+
+            rowY -= 38f;
+        }
+
+        if (parkedVehicles.isEmpty()) {
+            batch.begin();
+            font.setColor(new Color(0.6f, 0.6f, 0.6f, 1f));
+            font.draw(batch, "This garage is empty.", dX + 16f, rowY + 22f);
+            batch.end();
+        }
+
+        font.getData().setScale(1.4f); // Reset scale
+
+        // Input Handling
+        if (Gdx.input.isButtonJustPressed(Input.Buttons.LEFT)) {
+            float mx = Gdx.input.getX();
+            float my = Gdx.graphics.getHeight() - Gdx.input.getY();
+
+            if (rGarageDetailClose.contains(mx, my)) {
+                showGarageDetailDialog = false;
+                selectedGarageForDetails = null;
+                return;
+            }
+
+            for (int i = 0; i < garageDetailSellBtns.size(); i++) {
+                if (garageDetailSellBtns.get(i).contains(mx, my)) {
+                    Vehicle vToSell = parkedVehicles.get(i);
+                    long resale = vToSell.getResaleValue();
+                    gameState.getEconomy().earn(resale);
+                    gameState.removeVehicle(vToSell);
+                    showFeedback("Vehicle sold for $" + resale, Color.GREEN);
+                    return; // Will re-render next frame
                 }
             }
         }

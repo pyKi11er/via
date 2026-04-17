@@ -30,6 +30,7 @@ public abstract class Vehicle {
     private Route routeBeforeGarage;
     private int routeStopIndexBeforeGarage;
     private TileCoord maintenanceTargetCoord;
+    private TileCoord homeGarageLocation;
 
     protected Vehicle(
         VehicleType type,
@@ -168,5 +169,13 @@ public abstract class Vehicle {
         // Pause for 180 ticks (approx 3 seconds) to simulate maintenance time
         this.setStopWaitTicks(180);
         this.maintaining = true;
+    }
+
+    public TileCoord getHomeGarageLocation() {
+        return homeGarageLocation;
+    }
+
+    public void setHomeGarageLocation(TileCoord homeGarageLocation) {
+        this.homeGarageLocation = homeGarageLocation;
     }
 }

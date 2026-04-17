@@ -48,6 +48,8 @@ public class VehicleFactory {
         long purchaseTick = state.getTimeState() != null ? state.getTimeState().getTick() : 0;
         v.onPurchased(purchaseTick);
 
+        v.setHomeGarageLocation(garage.getLocation());
+
         state.addVehicle(v);
         return v;
     }

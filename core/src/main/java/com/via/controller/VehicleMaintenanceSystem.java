@@ -69,28 +69,44 @@ public class VehicleMaintenanceSystem {
                 continue;
             }
 
-            // ---> THE FIX: Ignore vehicles that are actively in the garage being maintained! <---
+
             if (v.isMaintaining()) continue;
 
             // Check if it's time for maintenance
             if (currentTick < v.getMaintenanceDueTick()) continue;
 
-            GarageAccess access = findNearestGarageAccessTile(state, v.getPosition().getOrigin());
-            if (access == null) continue;
+            //Route directly to the Home Garage
+            TileCoord homeLoc = v.getHomeGarageLocation();
+            if (homeLoc == null) continue;
+
+            Tile garageTile = map.getTile(homeLoc);
+
+            // Safety check: Did the player demolish this vehicle's home garage?
+            // If yes, it skips maintenance and will eventually be auto-sold when it gets too old.
+            if (garageTile == null || !(garageTile.getStructure() instanceof Garage)) {
+                continue;
+            }
+
+            Garage homeGarage = (Garage) garageTile.getStructure();
+            List<TileCoord> accessRoads = homeGarage.getAccessRoadTiles(map);
+            if (accessRoads.isEmpty()) continue;
+
+            // Grab the road tile directly connected to the home garage
+            TileCoord accessRoadTile = accessRoads.get(0);
 
             StopOverlay garageStop = new StopOverlay(
                 "Garage",
-                access.accessRoadTile,
+                accessRoadTile,
                 new StopAccess(
                     AccessType.ROAD_TILE,
-                    access.garageTile,
-                    computeDirection(access.garageTile, access.accessRoadTile)
+                    homeLoc,
+                    computeDirection(homeLoc, accessRoadTile)
                 ),
                 new Storage()
             );
 
             Route maintenanceRoute = new Route(List.of(garageStop));
-            v.enterGarageReturn(maintenanceRoute, access.accessRoadTile);
+            v.enterGarageReturn(maintenanceRoute, accessRoadTile);
         }
     }
 

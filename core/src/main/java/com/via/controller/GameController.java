@@ -1,5 +1,6 @@
 package com.via.controller;
 
+import com.via.model.Constants;
 import com.via.model.GameState;
 import com.via.model.building.Building;
 import com.via.model.building.Garage;
@@ -35,23 +36,40 @@ public class GameController {
      * @return null on success, or a human-readable error message on failure.
      */
     public static String buyVehicle(GameState state, VehicleType type) {
-        Garage garage = findGarage(state);
-        if (garage == null)
-            return "No garage available — build one first.";
+        // 1. Find a garage that has available capacity
+        Garage availableGarage = null;
+        for (Building b : state.getBuildings()) {
+            if (b instanceof Garage g) {
+                long parkedCount = state.getVehicles().stream()
+                    .filter(v -> v.getHomeGarageLocation() != null &&
+                        v.getHomeGarageLocation().equals(g.getLocation()))
+                    .count();
 
+                if (parkedCount < Constants.GARAGE_CAPACITY) {
+                    availableGarage = g;
+                    break; // Found one with space!
+                }
+            }
+        }
+
+        if (availableGarage == null) {
+            return "No available garage space! Build another garage.";
+        }
+
+        // 2. Check costs
         long cost = VEHICLE_CATALOG.stream()
-                .filter(e -> e.type() == type)
-                .mapToLong(VehicleCatalogEntry::purchaseCost)
-                .findFirst()
-                .orElse(0L);
+            .filter(e -> e.type() == type)
+            .mapToLong(VehicleCatalogEntry::purchaseCost)
+            .findFirst()
+            .orElse(0L);
 
         if (state.getEconomy().getCapital() < cost)
             return String.format("Insufficient funds — need $%,d.", cost);
 
-        VehicleFactory.buy(state, garage, type);
+        // 3. Buy and assign to the available garage
+        VehicleFactory.buy(state, availableGarage, type);
         return null;
     }
-
     /** Assign a vehicle to a route immediately. */
     public static void assignVehicleToRoute(Vehicle vehicle, Route route) {
         vehicle.assignRoute(route);

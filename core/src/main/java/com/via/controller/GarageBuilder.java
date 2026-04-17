@@ -1,9 +1,9 @@
 package com.via.controller;
 
+import com.via.model.GameState;
 import com.via.model.building.Footprint;
 import com.via.model.building.Garage;
 import com.via.model.building.Road;
-import com.via.model.economy.PlayerEconomy;
 import com.via.model.map.Map;
 import com.via.model.map.Tile;
 import com.via.model.map.TileCoord;
@@ -13,19 +13,19 @@ import com.via.model.map.TileCoord;
  */
 public class GarageBuilder {
 
-    private final Map map;
-    private final PlayerEconomy economy;
+    private final GameState state;
     private final int baseCost;
 
-    public GarageBuilder(Map map, PlayerEconomy economy, int baseCost) {
-        this.map = map;
-        this.economy = economy;
+    public GarageBuilder(GameState state, int baseCost) {
+        this.state = state;
         this.baseCost = baseCost;
     }
 
     /** Attempts to place a 1x1 garage at the provided tile coordinate. */
     public boolean placeGarage(TileCoord coord) {
+        Map map = state.getMap();
         Tile tile = map.getTile(coord);
+
         if (tile == null) throw new IllegalArgumentException("Invalid coordinate: " + coord.x + "," + coord.y);
         if (tile.getStructure() != null || tile.getOverlay() != null) return false;
 
@@ -34,15 +34,17 @@ public class GarageBuilder {
             .anyMatch(t -> t != null && t.getStructure() instanceof Road);
 
         if (!adjacentRoad) {
-            throw new IllegalArgumentException("Garage must be placed adjacent to a road tile.");
+            throw new IllegalArgumentException("Garage must be placed adjacent to a road.");
         }
 
-        if (economy != null && baseCost > 0) {
-            economy.deduct(baseCost);
+        if (baseCost > 0) {
+            state.getEconomy().deduct(baseCost);
         }
 
-        tile.setStructure(new Garage(new Footprint(coord, 1, 1)));
+        Garage garage = new Garage(new Footprint(coord, 1, 1));
+        tile.setStructure(garage);
+        state.addBuilding(garage); // Ensure GameState tracks this new garage
+
         return true;
     }
 }
-

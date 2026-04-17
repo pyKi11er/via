@@ -45,6 +45,9 @@ public class VehicleMovementSystem {
 
         occupancy.clear();
         for (Vehicle v : state.getVehicles()) {
+            // This prevents the parked vehicle from causing a massive traffic jam.
+            if (v.isMaintaining()) continue;
+
             VehiclePosition pos = v.getPosition();
             if (pos == null) continue;
             markOccupied(pos.getOrigin(), v);
@@ -66,7 +69,19 @@ public class VehicleMovementSystem {
     private void updateVehicleMovement(GameState state, Vehicle v,
                                        VehiclePosition pos, Map map, float delta) {
         if (v.getStopWaitTicks() > 0) {
-            v.setStopWaitTicks(v.getStopWaitTicks() - 1);
+            if (v.isMaintaining() && v.getStopWaitTicks() == 1) {
+                // Try to pay right before maintenance finishes
+                if (state.getEconomy().getCapital() >= v.getMaintenanceCost()) {
+                    state.getEconomy().deduct(v.getMaintenanceCost());
+                    v.rescheduleNextMaintenanceDueTick(state.getTimeState().getTick());
+                    v.setStopWaitTicks(0); // Automatically clears maintaining flag
+                } else {
+                    // Bankrupt! Freeze at 1 tick left. Vehicle stays off the road.
+                    return;
+                }
+            } else {
+                v.setStopWaitTicks(v.getStopWaitTicks() - 1);
+            }
             return;
         }
 

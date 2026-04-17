@@ -89,8 +89,8 @@ public class GameScreen implements Screen {
     private Rectangle rPopupClose;
 
     // build mode options inside the Build popup
-    private final Rectangle[] buildOptions = new Rectangle[4];
-    private final String[] buildLabels = {"Road", "Stop", "Garage", "Terraform"};
+    private final Rectangle[] buildOptions = new Rectangle[5]; // Changed from 4 to 5
+    private final String[] buildLabels = {"Road", "Stop", "Garage", "Terraform", "Demolish"}; // Added Demolish
     private int activeBuildOption = -1;
 
     // minimap content bounds (lazy-computed once, 0 = not yet computed)
@@ -263,6 +263,7 @@ public class GameScreen implements Screen {
             case 0 -> tile != null && tile.isEmpty();
             case 1 -> stopBuilder.canPlaceStopAt(hoveredTile);
             case 2 -> tile != null && tile.isEmpty(); // Garage placeholder validation
+            case 4 -> tile != null && tile.getStructure() instanceof Garage;
             default -> false;
         };
 
@@ -398,6 +399,21 @@ public class GameScreen implements Screen {
 
         if (activeBuildOption == 3) { showFeedback("Terraform coming soon.", Color.YELLOW); return; }
 
+        if (activeBuildOption == 4) {
+            Tile tile = gameState.getMap().getTile(coord);
+            if (tile != null && tile.getStructure() instanceof Garage garage) {
+                // 1. Remove the structure from the map tile
+                tile.setStructure(null);
+
+                // 2. Remove the building from the GameState registry
+                gameState.removeBuilding(garage);
+
+                showFeedback("Garage demolished!", Color.GREEN);
+            } else {
+                showFeedback("Click on a Garage to demolish it.", Color.RED);
+            }
+            return;
+        }
         // no build mode active — just print tile info to console
         Tile tile = gameState.getMap().getTile(coord);
         if (tile != null) {
@@ -631,12 +647,13 @@ public class GameScreen implements Screen {
 
     private void drawPopup() {
         // popup size varies by tab; Buy tab is taller and wider
+        boolean isBuildTab = (activeTab == 0);
         boolean isBuyTab = (activeTab == 2);
         boolean isRoutesTab = (activeTab == 1);
         boolean isVehiclesTab = (activeTab == 3);
 
-        float popupX = (isBuyTab || isRoutesTab || isVehiclesTab) ? 8f : tabBtns[activeTab].x;
-        float popupW = (isBuyTab || isRoutesTab || isVehiclesTab) ? 720f : 600f;
+        float popupX = (isBuildTab || isBuyTab || isRoutesTab || isVehiclesTab) ? 8f : tabBtns[activeTab].x;
+        float popupW = (isBuildTab || isBuyTab || isRoutesTab || isVehiclesTab) ? 720f : 600f;
         int vehicleCount = isVehiclesTab ? gameState.getVehicles().size() : 0;
         int stopCount = isRoutesTab ? countMapStops() : 0;
         float popupH = isBuyTab ? 290f

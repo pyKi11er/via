@@ -219,6 +219,14 @@ public class WorldMapRenderer {
             VehiclePosition pos = v.getPosition();
             if (pos == null) continue;
 
+            if (v.isMaintaining()) {
+                // Draw translucent to indicate it is "inside" the garage being serviced
+                batch.setColor(1f, 1f, 1f, 0.4f);
+                draw(getVehicleSprite(v), pos.getOrigin().x * TILE_SIZE, pos.getOrigin().y * TILE_SIZE);
+                batch.setColor(1f, 1f, 1f, 1f); // reset color for other sprites
+                continue; // Skip the lane positioning logic
+            }
+
             float sx = lerp(pos.getOrigin().x * TILE_SIZE,
                 pos.getDestination().x * TILE_SIZE, pos.getProgress());
             float sy = lerp(pos.getOrigin().y * TILE_SIZE,
@@ -245,6 +253,7 @@ public class WorldMapRenderer {
             draw(getVehicleSprite(v), sx + laneX, sy + laneY);
         }
     }
+
     private TextureRegion getVehicleSprite(Vehicle v) {
         int idx = getMovementDirection(v.getPosition()).ordinal();
         return switch (v.getType()) {

@@ -2,16 +2,14 @@ package com.via.model.vehicle;
 
 import com.via.model.GameState;
 import com.via.model.building.Garage;
-import com.via.model.building.Road;
 import com.via.model.enums.VehicleType;
 import com.via.model.map.Map;
-import com.via.model.map.Structure;
-import com.via.model.map.Tile;
 import com.via.model.map.TileCoord;
+
+import java.util.List;
 
 /**
  * Vehicle creation / purchase logic.
- *
  * Vehicles can only be purchased in a {@link Garage}.
  */
 public class VehicleFactory {
@@ -24,9 +22,14 @@ public class VehicleFactory {
         Map map = state.getMap();
         if (map == null) throw new IllegalStateException("state.map must not be null");
 
-        TileCoord origin = garage.getLocation();
-        if (origin == null) throw new IllegalArgumentException("garage location must not be null");
-        TileCoord destination = chooseAdjacentRoadNeighbor(map, origin);
+        // FIX: Vehicles must spawn on the road, not inside the building tile, or BFS will fail.
+        List<TileCoord> accessRoads = garage.getAccessRoadTiles(map);
+        if (accessRoads.isEmpty()) {
+            throw new IllegalStateException("Garage has no adjacent road to spawn vehicle on.");
+        }
+
+        TileCoord origin = accessRoads.get(0);
+        TileCoord destination = origin; // Will update on the first movement tick
 
         VehiclePosition pos = new VehiclePosition(origin, destination);
         Vehicle v = switch (type) {
@@ -38,7 +41,6 @@ public class VehicleFactory {
             case CITY_BUS     -> new CityBus(pos);
         };
 
-
         // Charge purchase cost.
         state.getEconomy().deduct(v.getPurchaseCost());
 
@@ -49,18 +51,4 @@ public class VehicleFactory {
         state.addVehicle(v);
         return v;
     }
-
-    private static TileCoord chooseAdjacentRoadNeighbor(Map map, TileCoord origin) {
-        for (TileCoord neighbor : map.getAdjacentCoords(origin)) {
-            Tile tile = map.getTile(neighbor);
-            if (tile == null) continue;
-            Structure s = tile.getStructure();
-            if (s instanceof Road) {
-                return neighbor;
-            }
-        }
-        // Isolated road tile (rare on properly connected networks) -> stand still.
-        return origin;
-    }
 }
-

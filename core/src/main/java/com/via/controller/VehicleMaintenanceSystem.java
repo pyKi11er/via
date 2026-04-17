@@ -49,11 +49,31 @@ public class VehicleMaintenanceSystem {
                 continue;
             }
 
-            if (v.isReturningToGarage()) continue;
-            if (currentTick < v.getMaintenanceDueTick()) continue;
+            if (v.isReturningToGarage()) {
+                // Garage Demolition Safety Check
+                TileCoord target = v.getMaintenanceTargetCoord();
+                boolean garageExists = false;
+                for (TileCoord neighbor : map.getAdjacentCoords(target)) {
+                    if (isGarageTile(map, neighbor)) {
+                        garageExists = true;
+                        break;
+                    }
+                }
 
-            state.getEconomy().deduct(v.getMaintenanceCost());
-            v.rescheduleNextMaintenanceDueTick(currentTick);
+                if (!garageExists) {
+                    // Abort maintenance! Garage was demolished.
+                    v.restoreAfterGarageReturn();
+                    v.setStopWaitTicks(0); // Cancel the pause
+                    v.rescheduleNextMaintenanceDueTick(currentTick); // Try again immediately
+                }
+                continue;
+            }
+
+            // ---> THE FIX: Ignore vehicles that are actively in the garage being maintained! <---
+            if (v.isMaintaining()) continue;
+
+            // Check if it's time for maintenance
+            if (currentTick < v.getMaintenanceDueTick()) continue;
 
             GarageAccess access = findNearestGarageAccessTile(state, v.getPosition().getOrigin());
             if (access == null) continue;
@@ -66,7 +86,7 @@ public class VehicleMaintenanceSystem {
                     access.garageTile,
                     computeDirection(access.garageTile, access.accessRoadTile)
                 ),
-                new Storage()  // fix: never null
+                new Storage()
             );
 
             Route maintenanceRoute = new Route(List.of(garageStop));

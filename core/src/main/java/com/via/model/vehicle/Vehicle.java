@@ -1,6 +1,7 @@
 package com.via.model.vehicle;
 
 import com.via.model.building.StopOverlay;
+import com.via.model.Constants; // Restored the Constants import
 import com.via.model.enums.VehicleType;
 import com.via.model.map.TileCoord;
 
@@ -29,12 +30,6 @@ public abstract class Vehicle {
     private Route routeBeforeGarage;
     private int routeStopIndexBeforeGarage;
     private TileCoord maintenanceTargetCoord;
-
-    // --- AGING CONSTANTS ---
-    // Assuming 60 ticks per second: 108,000 ticks = 30 minutes of real-time gameplay to reach max age
-    private static final long VEHICLE_MAX_AGE_TICKS = 108_000L;
-    private static final long BASE_MAINTENANCE_INTERVAL = 7_200L; // 2 minutes
-    private static final long MIN_MAINTENANCE_INTERVAL = 1_200L;  // 20 seconds
 
     protected Vehicle(
         VehicleType type,
@@ -122,7 +117,7 @@ public abstract class Vehicle {
 
     public void onPurchased(long purchaseTick) {
         this.ageTicks = 0;
-        this.rescheduleNextMaintenanceDueTick(purchaseTick);
+        this.maintenanceDueTick = purchaseTick + Constants.getMaintenanceIntervalTicks(0);
         this.returningToGarage = false;
         this.maintaining = false;
         this.routeBeforeGarage = null;
@@ -135,22 +130,16 @@ public abstract class Vehicle {
         this.ageTicks += deltaTicks;
     }
 
-    /** Shrinks the interval between maintenance trips as the vehicle ages. */
     public void rescheduleNextMaintenanceDueTick(long currentTick) {
-        float ageFactor = Math.min(1.0f, (float) ageTicks / VEHICLE_MAX_AGE_TICKS);
-        long interval = (long) (BASE_MAINTENANCE_INTERVAL - ((BASE_MAINTENANCE_INTERVAL - MIN_MAINTENANCE_INTERVAL) * ageFactor));
-        this.maintenanceDueTick = currentTick + interval;
+        this.maintenanceDueTick = currentTick + Constants.getMaintenanceIntervalTicks(ageTicks);
     }
 
     public boolean isOverAged() {
-        return ageTicks >= VEHICLE_MAX_AGE_TICKS;
+        return ageTicks >= Constants.VEHICLE_MAX_AGE_TICKS;
     }
 
-    /** Depreciates value down to 10% scrap cost based on age. */
     public long getResaleValue() {
-        float ageFactor = Math.min(1.0f, (float) ageTicks / VEHICLE_MAX_AGE_TICKS);
-        long scrapValue = purchaseCost / 10;
-        return (long) (purchaseCost - ((purchaseCost - scrapValue) * ageFactor));
+        return Constants.getResaleValue(purchaseCost, ageTicks);
     }
 
     public void enterGarageReturn(Route garageMaintenanceRoute, TileCoord maintenanceTargetCoord) {

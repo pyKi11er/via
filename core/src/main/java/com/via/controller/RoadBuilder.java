@@ -37,6 +37,17 @@ public class RoadBuilder {
         }
         if (!tile.isEmpty()) return false;
 
+        // Reject if any adjacent road tile has a height difference greater than 1
+        for (TileCoord adj : map.getAdjacentCoords(coord)) {
+            Tile adjTile = map.getTile(adj);
+            if (adjTile != null && adjTile.getStructure() instanceof Road) {
+                if (map.getHeightDifference(coord, adj) > 1) {
+                    throw new IllegalArgumentException(
+                        "Cannot build road: height difference with adjacent road exceeds 1.");
+                }
+            }
+        }
+
         // Calculate and deduct cost
         int cost = map.getRoadBuildCost(coord, baseCost, clearingCostPerTree);
         economy.deduct(cost);

@@ -31,6 +31,8 @@ public class WorldMapRenderer {
 
     // Terrain
     private final TextureRegion   texGrass;
+    private final TextureRegion   texFlatGround;
+    private final TextureRegion   texElevatedGround;
     private final TextureRegion   texSlopeN, texSlopeS, texSlopeE, texSlopeW;
     private final TextureRegion[] texForest = new TextureRegion[4];
 
@@ -57,10 +59,12 @@ public class WorldMapRenderer {
         fallbackTiles = TextureRegion.split(fallbackSheet, SPRITE_SIZE, SPRITE_SIZE);
 
         texGrass  = load("terrain/grass.png",   fallbackTiles[0][0]);
-        texSlopeN = load("terrain/slope_n.png", fallbackTiles[0][2]);
-        texSlopeS = load("terrain/slope_s.png", fallbackTiles[0][2]);
-        texSlopeE = load("terrain/slope_e.png", fallbackTiles[0][2]);
-        texSlopeW = load("terrain/slope_w.png", fallbackTiles[0][2]);
+        texFlatGround     = generateSolidTexture(0.85f, 0.45f, 0.10f); // orange
+        texElevatedGround = generateSolidTexture(0.10f, 0.40f, 0.05f); // dark green
+        texSlopeN = loadOrGenerateSlope("terrain/slope_n.png", SlopeEdge.NORTH);
+        texSlopeS = loadOrGenerateSlope("terrain/slope_s.png", SlopeEdge.SOUTH);
+        texSlopeE = loadOrGenerateSlope("terrain/slope_e.png", SlopeEdge.EAST);
+        texSlopeW = loadOrGenerateSlope("terrain/slope_w.png", SlopeEdge.WEST);
         texForest[0] = load("terrain/forest_1.jpg", fallbackTiles[0][0]);
         texForest[1] = load("terrain/forest_2.jpg", fallbackTiles[0][0]);
         texForest[2] = load("terrain/forest_3.jpg", fallbackTiles[0][0]);
@@ -157,7 +161,9 @@ public class WorldMapRenderer {
                 Tile tile = map.getTile(coord);
                 if (tile == null) continue;
                 float sx = x * TILE_SIZE, sy = y * TILE_SIZE;
+
                 draw(getTerrainTexture(tile.getTerrain()), sx, sy);
+
                 if (tile.getStructure() != null)
                     draw(getStructureTexture(tile.getStructure(), map), sx, sy);
                 if (tile.getOverlay() != null)
@@ -170,13 +176,10 @@ public class WorldMapRenderer {
         if (terrain == null) return texGrass;
         int f = terrain.getForestLevel();
         if (f > 0) return texForest[Math.min(f - 1, 3)];
-        return switch (terrain.getType()) {
-            case SLOPE_NORTH -> texSlopeN;
-            case SLOPE_SOUTH -> texSlopeS;
-            case SLOPE_EAST  -> texSlopeE;
-            case SLOPE_WEST  -> texSlopeW;
-            default          -> texGrass;
-        };
+        int level = terrain.getTerrainLevel();
+        if (level < 0) return texFlatGround;
+        if (level == 0) return texGrass;
+        return texElevatedGround;
     }
 
     private TextureRegion getStructureTexture(Structure structure, Map map) {
@@ -252,6 +255,107 @@ public class WorldMapRenderer {
             return new TextureRegion(t);
         }
         return fallback; // specific slice, NOT the whole sheet
+    }
+
+    // -------------------------------------------------------------------------
+    // Slope texture generation
+    // -------------------------------------------------------------------------
+
+    /** Which edge of the tile faces downhill (carries the shadow). */
+    private enum SlopeEdge { NORTH, SOUTH, EAST, WEST }
+
+    /**
+     * Returns the asset PNG if it exists; otherwise generates a gradient
+     * texture procedurally so slopes are always visually distinct.
+     * When you drop real artwork into {@code assets/terrain/slope_*.png} it
+     * will be picked up automatically on the next launch.
+     */
+    private TextureRegion loadOrGenerateSlope(String path, SlopeEdge shadow) {
+        if (Gdx.files.internal(path).exists()) {
+            return load(path, null);
+        }
+        return generateSlopeTexture(shadow);
+    }
+
+    /**
+     * Generates a 32×32 gradient tile where the downhill edge is dark
+     * (cliff/shadow) and the uphill edge is bright (sun-lit grass).
+     *
+     * <p>Colour key:
+     * <ul>
+     *   <li>Uphill highlight  – light green  #7ab24a
+     *   <li>Normal grass      – medium green #5d8a3c
+     *   <li>Downhill shadow   – dark cliff   #2d5014
+     * </ul>
+     *
+     * <p>In LibGDX, Pixmap row 0 maps to the <em>top</em> of the rendered
+     * sprite (= north side of tile), so "shadow at top" = SLOPE_NORTH, etc.
+     */
+    private TextureRegion generateSlopeTexture(SlopeEdge shadow) {
+        // Colour stops (R, G, B)
+        final int[] HIGHLIGHT = {122, 178,  74};   // bright uphill
+        final int[] MIDTONE   = { 93, 138,  60};   // normal grass
+        final int[] DARK      = { 35,  65,  15};   // deep shadow / cliff
+
+        com.badlogic.gdx.graphics.Pixmap pm =
+            new com.badlogic.gdx.graphics.Pixmap(TILE_SIZE, TILE_SIZE,
+                com.badlogic.gdx.graphics.Pixmap.Format.RGBA8888);
+
+        for (int py = 0; py < TILE_SIZE; py++) {
+            for (int px = 0; px < TILE_SIZE; px++) {
+                // t = 0.0 at the shadow edge, 1.0 at the highlight edge
+                float t = switch (shadow) {
+                    case NORTH -> (float) py / (TILE_SIZE - 1);          // row 0=top=north
+                    case SOUTH -> 1.0f - (float) py / (TILE_SIZE - 1);   // row 31=bottom=south
+                    case EAST  -> 1.0f - (float) px / (TILE_SIZE - 1);   // col 31=right=east
+                    case WEST  -> (float) px / (TILE_SIZE - 1);           // col 0=left=west
+                };
+
+                // Map t: 0–0.3 → dark→mid, 0.3–1.0 → mid→highlight
+                int r, g, b;
+                if (t < 0.3f) {
+                    float s = t / 0.3f;
+                    r = lerpi(DARK[0], MIDTONE[0], s);
+                    g = lerpi(DARK[1], MIDTONE[1], s);
+                    b = lerpi(DARK[2], MIDTONE[2], s);
+                } else {
+                    float s = (t - 0.3f) / 0.7f;
+                    r = lerpi(MIDTONE[0], HIGHLIGHT[0], s);
+                    g = lerpi(MIDTONE[1], HIGHLIGHT[1], s);
+                    b = lerpi(MIDTONE[2], HIGHLIGHT[2], s);
+                }
+
+                pm.setColor(r / 255f, g / 255f, b / 255f, 1f);
+                pm.drawPixel(px, py);
+            }
+        }
+
+        com.badlogic.gdx.graphics.Texture tex =
+            new com.badlogic.gdx.graphics.Texture(pm);
+        tex.setFilter(com.badlogic.gdx.graphics.Texture.TextureFilter.Nearest,
+                      com.badlogic.gdx.graphics.Texture.TextureFilter.Nearest);
+        pm.dispose();
+        ownedTextures.add(tex);
+        return new TextureRegion(tex);
+    }
+
+    private static int lerpi(int a, int b, float t) {
+        return Math.round(a + (b - a) * t);
+    }
+
+    private TextureRegion generateSolidTexture(float r, float g, float b) {
+        com.badlogic.gdx.graphics.Pixmap pm =
+            new com.badlogic.gdx.graphics.Pixmap(TILE_SIZE, TILE_SIZE,
+                com.badlogic.gdx.graphics.Pixmap.Format.RGBA8888);
+        pm.setColor(r, g, b, 1f);
+        pm.fill();
+        com.badlogic.gdx.graphics.Texture tex =
+            new com.badlogic.gdx.graphics.Texture(pm);
+        tex.setFilter(com.badlogic.gdx.graphics.Texture.TextureFilter.Nearest,
+                      com.badlogic.gdx.graphics.Texture.TextureFilter.Nearest);
+        pm.dispose();
+        ownedTextures.add(tex);
+        return new TextureRegion(tex);
     }
 
     public void dispose() {

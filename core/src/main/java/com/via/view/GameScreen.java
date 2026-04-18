@@ -257,18 +257,38 @@ public class GameScreen implements Screen {
         boolean canPlace = switch (activeBuildOption) {
             case 0 -> tile != null && tile.isEmpty();
             case 1 -> stopBuilder.canPlaceStopAt(hoveredTile);
+            case 3 -> tile != null
+                && (gameState.getMap().canTerraform(hoveredTile, 1)
+                 || gameState.getMap().canTerraform(hoveredTile, -1));
             default -> false;
         };
 
-        // green = can build here, red = blocked
+        Color fillColor, lineColor;
+        if (activeBuildOption == 3 && tile != null) {
+            int terrainLevel = tile.getTerrain().getTerrainLevel();
+            if (!canPlace) {
+                fillColor = new Color(0.9f, 0.2f, 0.2f, 0.35f);
+                lineColor = new Color(1.0f, 0.3f, 0.3f, 0.9f);
+            } else if (terrainLevel > 0) {
+                fillColor = new Color(0.05f, 0.45f, 0.10f, 0.45f);
+                lineColor = new Color(0.10f, 0.70f, 0.20f, 0.9f);
+            } else {
+                fillColor = new Color(0.85f, 0.45f, 0.05f, 0.40f);
+                lineColor = new Color(1.0f, 0.60f, 0.10f, 0.9f);
+            }
+        } else {
+            fillColor = canPlace ? new Color(0.2f, 0.8f, 0.2f, 0.35f) : new Color(0.9f, 0.2f, 0.2f, 0.35f);
+            lineColor = canPlace ? new Color(0.3f, 1.0f, 0.3f, 0.9f) : new Color(1.0f, 0.3f, 0.3f, 0.9f);
+        }
+
         sr.begin(ShapeRenderer.ShapeType.Filled);
-        sr.setColor(canPlace ? new Color(0.2f, 0.8f, 0.2f, 0.35f) : new Color(0.9f, 0.2f, 0.2f, 0.35f));
+        sr.setColor(fillColor);
         sr.rect(hoveredTile.x * Constants.TILE_SIZE, hoveredTile.y * Constants.TILE_SIZE,
             Constants.TILE_SIZE, Constants.TILE_SIZE);
         sr.end();
 
         sr.begin(ShapeRenderer.ShapeType.Line);
-        sr.setColor(canPlace ? new Color(0.3f, 1.0f, 0.3f, 0.9f) : new Color(1.0f, 0.3f, 0.3f, 0.9f));
+        sr.setColor(lineColor);
         sr.rect(hoveredTile.x * Constants.TILE_SIZE, hoveredTile.y * Constants.TILE_SIZE,
             Constants.TILE_SIZE, Constants.TILE_SIZE);
         sr.end();
@@ -284,8 +304,8 @@ public class GameScreen implements Screen {
         if (Gdx.input.isKeyPressed(Input.Keys.UP))    mapCamera.translate(0, CAMERA_SPEED * delta);
         if (Gdx.input.isKeyPressed(Input.Keys.DOWN))  mapCamera.translate(0, -CAMERA_SPEED * delta);
 
-        // Mouse drag scroll (right button so it doesn't conflict with click)
-        if (Gdx.input.isButtonPressed(Input.Buttons.RIGHT))
+        // Mouse drag scroll (right button) — disabled in Terraform mode (right-click lowers there)
+        if (activeBuildOption != 3 && Gdx.input.isButtonPressed(Input.Buttons.RIGHT))
             mapCamera.translate(-Gdx.input.getDeltaX(), Gdx.input.getDeltaY());
 
         // Road drag — hold LMB to paint roads continuously
@@ -295,10 +315,31 @@ public class GameScreen implements Screen {
             TileCoord dc = new TileCoord((int)(dw.x / Constants.TILE_SIZE), (int)(dw.y / Constants.TILE_SIZE));
             if (!dc.equals(lastDragTile) && gameState.getMap().isWithinBounds(dc)) {
                 lastDragTile = dc;
-                try { roadBuilder.buildRoad(dc); } catch (IllegalArgumentException ignored) {}
+                try {
+                    roadBuilder.buildRoad(dc);
+                } catch (IllegalArgumentException e) {
+                    if (e.getMessage() != null && e.getMessage().contains("height difference")) {
+                        showFeedback("Cannot build road: terrain height difference is more than 1.", Color.RED);
+                    }
+                }
             }
         }
         if (!Gdx.input.isButtonPressed(Input.Buttons.LEFT)) lastDragTile = null;
+
+        // Terraform mode: left-click raises, right-click lowers (handled before the left-only guard)
+        if (activeBuildOption == 3 && Gdx.input.justTouched()) {
+            boolean isLeft  = Gdx.input.isButtonJustPressed(Input.Buttons.LEFT);
+            boolean isRight = Gdx.input.isButtonJustPressed(Input.Buttons.RIGHT);
+            if (isLeft || isRight) {
+                Vector3 tw = new Vector3(Gdx.input.getX(), Gdx.input.getY(), 0);
+                mapCamera.unproject(tw);
+                TileCoord tc = new TileCoord(
+                    (int)(tw.x / Constants.TILE_SIZE), (int)(tw.y / Constants.TILE_SIZE));
+                if (gameState.getMap().isWithinBounds(tc))
+                    applyTerraform(tc, isLeft ? 1 : -1);
+                return;
+            }
+        }
 
         // Only process left clicks for interaction
         if (!Gdx.input.justTouched() || !Gdx.input.isButtonJustPressed(Input.Buttons.LEFT)) return;
@@ -373,7 +414,7 @@ public class GameScreen implements Screen {
             return;
         }
         if (activeBuildOption == 2) { showFeedback("Garage placement coming soon.", Color.YELLOW); return; }
-        if (activeBuildOption == 3) { showFeedback("Terraform coming soon.", Color.YELLOW); return; }
+        if (activeBuildOption == 3) return; // handled in the pre-guard block above
 
         // no build mode active — just print tile info to console
         Tile tile = gameState.getMap().getTile(coord);
@@ -391,6 +432,26 @@ public class GameScreen implements Screen {
             case 2 -> gameEngine.getTimeController().setSpeed(SpeedSetting.FAST);
             case 3 -> gameEngine.getTimeController().setSpeed(SpeedSetting.VERY_FAST);
         }
+    }
+
+    private void applyTerraform(TileCoord coord, int delta) {
+        com.via.model.map.Map map = gameState.getMap();
+        if (!map.canTerraform(coord, delta)) {
+            String reason = delta > 0
+                ? "Cannot raise: tile occupied or would exceed max height difference."
+                : "Cannot lower: tile occupied or already at minimum height.";
+            showFeedback(reason, Color.RED);
+            return;
+        }
+        long cost = (long) Math.abs(delta) * Constants.TERRAFORM_COST_PER_LEVEL;
+        if (gameState.getEconomy().getCapital() < cost) {
+            showFeedback("Not enough money (need $" + cost + ").", Color.RED);
+            return;
+        }
+        map.terraform(coord, delta, Constants.TERRAFORM_COST_PER_LEVEL);
+        gameState.getEconomy().deduct(cost);
+        com.via.controller.TerrainGenerator.updateSlopeTypes(map);
+        showFeedback((delta > 0 ? "Raised" : "Lowered") + " tile.  Cost: $" + cost, Color.GREEN);
     }
 
     private void handleDialogInput() {
@@ -428,11 +489,23 @@ public class GameScreen implements Screen {
             int modeCost = switch (activeBuildOption) {
                 case 0 -> 100;
                 case 1 -> Constants.STOP_PLACEMENT_COST;
+                case 3 -> Constants.TERRAFORM_COST_PER_LEVEL;
                 default -> 0;
             };
-            String modeLabel = modeCost > 0
-                ? "Mode: " + buildLabels[activeBuildOption] + "  [cost: $" + modeCost + "]"
-                : "Mode: " + buildLabels[activeBuildOption];
+            String modeLabel;
+            if (activeBuildOption == 3) {
+                String heightInfo = "";
+                if (hoveredTile != null) {
+                    int h2 = gameState.getMap().getTile(hoveredTile).getTerrain().getTerrainLevel();
+                    heightInfo = "  H=" + h2;
+                }
+                modeLabel = "Mode: Terraform  [LClick:Raise  RClick:Lower  cost: $"
+                    + modeCost + "]" + heightInfo;
+            } else {
+                modeLabel = modeCost > 0
+                    ? "Mode: " + buildLabels[activeBuildOption] + "  [cost: $" + modeCost + "]"
+                    : "Mode: " + buildLabels[activeBuildOption];
+            }
             gl.setText(font, modeLabel);
             batch.begin();
             font.setColor(1.0f, 0.85f, 0.20f, 1f);

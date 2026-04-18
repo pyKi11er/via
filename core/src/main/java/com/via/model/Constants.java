@@ -17,6 +17,9 @@ public class Constants {
     /** Cost to place one stop (used by {@link com.via.controller.StopBuilder}). */
     public static final int STOP_PLACEMENT_COST = 2_000;
 
+    /** Cost to raise or lower one tile by one level. */
+    public static final int TERRAFORM_COST_PER_LEVEL = 500;
+
     /** Deduct maintenance once per interval per vehicle. */
     public static final int VEHICLE_MAINTENANCE_INTERVAL_TICKS = 18000; // 1 minute in game
 

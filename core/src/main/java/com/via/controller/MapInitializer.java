@@ -38,6 +38,9 @@ public class MapInitializer {
             }
         }
 
+        // Generate varied terrain heights before placing anything
+        TerrainGenerator.generate(map, 42L);
+
         GameState state = new GameState(map);
 
         seedForests(map);
@@ -71,6 +74,9 @@ public class MapInitializer {
 
         Route route = new Route(validStops);
         state.addRoute(route);
+
+        // Derive slope tile types from final heights (after all buildings are placed)
+        TerrainGenerator.updateSlopeTypes(map);
 
         // 6. Add vehicles
         VehiclePosition truckPos = new VehiclePosition(

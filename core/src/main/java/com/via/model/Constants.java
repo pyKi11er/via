@@ -12,6 +12,7 @@ public class Constants {
     public static final float FAST_MULTIPLIER = 2f;
     public static final float VERY_FAST_MULTIPLIER = 4f;
     public static final long STARTING_CAPITAL = 100_000L;
+    public static final int GARAGE_CAPACITY = 5;
 
     /** Cost to place one stop (used by {@link com.via.controller.StopBuilder}). */
     public static final int STOP_PLACEMENT_COST = 2_000;

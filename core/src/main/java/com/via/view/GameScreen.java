@@ -19,6 +19,7 @@ import com.via.controller.GameController;
 import com.via.controller.GameEngine;
 import com.via.controller.RoadBuilder;
 import com.via.controller.StopBuilder;
+import com.via.controller.GarageBuilder;
 import com.via.model.Constants;
 import com.via.model.GameState;
 import com.via.model.building.*;
@@ -43,6 +44,8 @@ public class GameScreen implements Screen {
     private final GameEngine gameEngine;
     private final RoadBuilder roadBuilder;
     private final StopBuilder stopBuilder;
+    private final GarageBuilder garageBuilder;
+
     /** Increments for player-placed stop names ("Stop 1", …). */
     private int playerStopSequence = 1;
 
@@ -86,8 +89,8 @@ public class GameScreen implements Screen {
     private Rectangle rPopupClose;
 
     // build mode options inside the Build popup
-    private final Rectangle[] buildOptions = new Rectangle[4];
-    private final String[] buildLabels = {"Road", "Stop", "Garage", "Terraform"};
+    private final Rectangle[] buildOptions = new Rectangle[5]; // Changed from 4 to 5
+    private final String[] buildLabels = {"Road", "Stop", "Garage", "Terraform", "Demolish"}; // Added Demolish
     private int activeBuildOption = -1;
 
     // minimap content bounds (lazy-computed once, 0 = not yet computed)
@@ -103,6 +106,7 @@ public class GameScreen implements Screen {
 
     // vehicle management UI
     private final List<Rectangle> vehicleAssignBtns = new ArrayList<>();
+    private final List<Rectangle> vehicleSellBtns = new ArrayList<>();
 
     // post-purchase route assignment dialog
     private boolean showRouteAssignDialog = false;
@@ -121,12 +125,19 @@ public class GameScreen implements Screen {
     private TileCoord hoveredTile = null;
     private TileCoord lastDragTile = null;
 
+    // Garage Detail UI
+    private boolean showGarageDetailDialog = false;
+    private Garage selectedGarageForDetails = null;
+    private Rectangle rGarageDetailClose;
+    private final List<Rectangle> garageDetailSellBtns = new ArrayList<>();
+
     public GameScreen(VIA game, GameState gameState) {
         this.game = game;
         this.gameState = gameState;
         this.gameEngine = new GameEngine(gameState);
         this.roadBuilder = new RoadBuilder(gameState.getMap(), gameState.getEconomy(), 100, 50);
         this.stopBuilder = new StopBuilder(gameState.getMap(), gameState.getEconomy(), Constants.STOP_PLACEMENT_COST);
+        this.garageBuilder = new GarageBuilder(gameState, 5000); // 5000 base cost for garages
 
         mapCamera = new OrthographicCamera();
         mapCamera.setToOrtho(false, Gdx.graphics.getWidth(), Gdx.graphics.getHeight());
@@ -227,7 +238,7 @@ public class GameScreen implements Screen {
         if (showPopup) drawPopup();
         if (showExitDialog) drawExitDialog();
         if (showRouteAssignDialog) drawRouteAssignDialog();
-
+        if (showGarageDetailDialog) drawGarageDetailDialog();
         drawFeedback();
     }
 
@@ -257,9 +268,11 @@ public class GameScreen implements Screen {
         boolean canPlace = switch (activeBuildOption) {
             case 0 -> tile != null && tile.isEmpty();
             case 1 -> stopBuilder.canPlaceStopAt(hoveredTile);
+            case 2 -> tile != null && tile.isEmpty();
             case 3 -> tile != null
                 && (gameState.getMap().canTerraform(hoveredTile, 1)
                  || gameState.getMap().canTerraform(hoveredTile, -1));
+            case 4 -> tile != null && tile.getStructure() instanceof Garage;
             default -> false;
         };
 
@@ -413,9 +426,49 @@ public class GameScreen implements Screen {
             }
             return;
         }
-        if (activeBuildOption == 2) { showFeedback("Garage placement coming soon.", Color.YELLOW); return; }
+        if (activeBuildOption == 2) {
+            if (gameState.getEconomy().getCapital() < 5000) {
+                showFeedback("Not enough money (need $5000).", Color.RED);
+                return;
+            }
+            try {
+                if (garageBuilder.placeGarage(coord)) {
+                    showFeedback("Garage built!", Color.GREEN);
+                } else {
+                    showFeedback("Tile is occupied.", Color.RED);
+                }
+            } catch (IllegalArgumentException e) {
+                showFeedback(e.getMessage(), Color.RED);
+            }
+            return;
+        }
+
         if (activeBuildOption == 3) return; // handled in the pre-guard block above
 
+        if (activeBuildOption == 4) {
+            Tile tile = gameState.getMap().getTile(coord);
+            if (tile != null && tile.getStructure() instanceof Garage garage) {
+                // 1. Remove the structure from the map tile
+                tile.setStructure(null);
+
+                // 2. Remove the building from the GameState registry
+                gameState.removeBuilding(garage);
+
+                showFeedback("Garage demolished!", Color.GREEN);
+            } else {
+                showFeedback("Click on a Garage to demolish it.", Color.RED);
+            }
+            return;
+        }
+        // If no build mode is active, check if they clicked a Garage
+        if (activeBuildOption == -1) {
+            Tile tile = gameState.getMap().getTile(coord);
+            if (tile != null && tile.getStructure() instanceof Garage clickedGarage) {
+                selectedGarageForDetails = clickedGarage;
+                showGarageDetailDialog = true;
+                return;
+            }
+        }
         // no build mode active — just print tile info to console
         Tile tile = gameState.getMap().getTile(coord);
         if (tile != null) {
@@ -484,14 +537,18 @@ public class GameScreen implements Screen {
         font.draw(batch, balStr, w - gl.width - 12f, h - TOP_BAR_H / 2f + gl.height / 2f);
         batch.end();
 
-        // show active build mode name in the centre
         if (activeBuildOption >= 0) {
             int modeCost = switch (activeBuildOption) {
                 case 0 -> 100;
                 case 1 -> Constants.STOP_PLACEMENT_COST;
+                case 2 -> 5000;
                 case 3 -> Constants.TERRAFORM_COST_PER_LEVEL;
                 default -> 0;
             };
+            if (activeBuildOption == 0 && hoveredTile != null) {
+                modeCost = gameState.getMap().getRoadBuildCost(hoveredTile, 100, 50);
+            }
+
             String modeLabel;
             if (activeBuildOption == 3) {
                 String heightInfo = "";
@@ -672,20 +729,28 @@ public class GameScreen implements Screen {
         return a + (b - a) * t;
     }
 
+    private boolean playerOwnsGarage() {
+        for (Building b : gameState.getBuildings()) {
+            if (b instanceof Garage) return true;
+        }
+        return false;
+    }
+
     private void drawPopup() {
         // popup size varies by tab; Buy tab is taller and wider
+        boolean isBuildTab = (activeTab == 0);
         boolean isBuyTab = (activeTab == 2);
         boolean isRoutesTab = (activeTab == 1);
         boolean isVehiclesTab = (activeTab == 3);
 
-        float popupX = (isBuyTab || isRoutesTab || isVehiclesTab) ? 8f : tabBtns[activeTab].x;
-        float popupW = (isBuyTab || isRoutesTab || isVehiclesTab) ? 720f : 600f;
+        float popupX = (isBuildTab || isBuyTab || isRoutesTab || isVehiclesTab) ? 8f : tabBtns[activeTab].x;
+        float popupW = (isBuildTab || isBuyTab || isRoutesTab || isVehiclesTab) ? 720f : 600f;
         int vehicleCount = isVehiclesTab ? gameState.getVehicles().size() : 0;
         int stopCount = isRoutesTab ? countMapStops() : 0;
         float popupH = isBuyTab ? 290f
-                : isRoutesTab ? Math.min(420f, 62f + Math.max(1, stopCount) * 36f + 54f)
-                : isVehiclesTab ? Math.min(400f, 62f + Math.max(1, vehicleCount) * 38f + 16f)
-                : 60f;
+            : isRoutesTab ? Math.min(420f, 62f + Math.max(1, stopCount) * 36f + 54f)
+            : isVehiclesTab ? Math.min(400f, 62f + Math.max(1, vehicleCount) * 38f + 16f)
+            : 60f;
 
         rPopup = new Rectangle(popupX, BOT_BAR_H + 5f, popupW, popupH);
         rPopupClose = new Rectangle(
@@ -815,8 +880,8 @@ public class GameScreen implements Screen {
             font.draw(batch, "Create Route", rPopup.x + 12f, rPopup.y + rPopup.height - 36f);
             font.setColor(new Color(0.50f, 0.55f, 0.65f, 1f));
             String selHint = selectedCount == 0 ? "select stops below"
-                           : selectedCount == 1 ? "1 stop selected — pick at least 2"
-                           : selectedCount + " stops selected";
+                : selectedCount == 1 ? "1 stop selected — pick at least 2"
+                : selectedCount + " stops selected";
             font.draw(batch, "—  " + selHint, rPopup.x + 120f, rPopup.y + rPopup.height - 36f);
             batch.end();
 
@@ -876,21 +941,22 @@ public class GameScreen implements Screen {
             font.getData().setScale(1.4f);
         }
 
-        // Vehicles tab — list with route assignment
         if (activeTab == 3) {
             List<Vehicle> vehicles = gameState.getVehicles();
 
-            // header
             font.getData().setScale(1.0f);
             batch.begin();
             font.setColor(new Color(0.70f, 0.80f, 1.0f, 1f));
             font.draw(batch, "Vehicles", rPopup.x + 12f, rPopup.y + rPopup.height - 36f);
             font.setColor(new Color(0.50f, 0.55f, 0.65f, 1f));
-            font.draw(batch, vehicles.size() + " total  —  click a row to assign route",
-                rPopup.x + 90f, rPopup.y + rPopup.height - 36f);
+            String subText = playerOwnsGarage()
+                ? vehicles.size() + " total  —  click a row to assign route or sell manually"
+                : vehicles.size() + " total  —  (Build a garage to sell vehicles)";
+            font.draw(batch, subText, rPopup.x + 90f, rPopup.y + rPopup.height - 36f);
             batch.end();
 
             vehicleAssignBtns.clear();
+            vehicleSellBtns.clear();
             float rowH = 34f;
             float curY = rPopup.y + rPopup.height - 58f;
 
@@ -919,9 +985,17 @@ public class GameScreen implements Screen {
                     .filter(e -> e.type() == v.getType())
                     .map(GameController.VehicleCatalogEntry::displayName)
                     .findFirst().orElse(v.getType().toString());
-                String routeInfo = hasRoute
-                    ? v.getAssignedRoute().size() + " stops"
-                    : "No route";
+
+                String routeInfo;
+                if (v.isReturningToGarage()) {
+                    routeInfo = "En route to Garage";
+                } else if (v.isMaintaining()) {
+                    routeInfo = "Maintaining...";
+                } else if (hasRoute) {
+                    routeInfo = v.getAssignedRoute().size() + " stops";
+                } else {
+                    routeInfo = "No route";
+                }
 
                 batch.begin();
                 font.setColor(Color.WHITE);
@@ -930,8 +1004,16 @@ public class GameScreen implements Screen {
                 font.draw(batch, routeInfo, rPopup.x + 340f, rowY + rowH / 2f + 7f);
                 batch.end();
 
-                Rectangle row = new Rectangle(rPopup.x + 8f, rowY, rPopup.width - 32f, rowH);
-                vehicleAssignBtns.add(row);
+                // Button for assigning route
+                Rectangle assignBtn = new Rectangle(rPopup.x + 8f, rowY, rPopup.width - 100f, rowH);
+                vehicleAssignBtns.add(assignBtn);
+
+                // Button for manual selling
+                if (playerOwnsGarage()) {
+                    Rectangle sellBtn = new Rectangle(rPopup.x + rPopup.width - 86f, rowY + 4f, 70f, rowH - 8f);
+                    vehicleSellBtns.add(sellBtn);
+                    drawBtn(sellBtn, "Sell", new Color(0.65f, 0.25f, 0.25f, 1f));
+                }
             }
 
             if (vehicles.isEmpty()) {
@@ -1035,7 +1117,19 @@ public class GameScreen implements Screen {
             }
 
             if (activeTab == 3) {
-                // Handle vehicle assignment clicks
+                // Handle manual sell logic first to avoid triggering route assignment
+                for (int i = 0; i < vehicleSellBtns.size(); i++) {
+                    if (vehicleSellBtns.get(i).contains(mx, my) && i < gameState.getVehicles().size()) {
+                        Vehicle v = gameState.getVehicles().get(i);
+                        long resale = v.getResaleValue();
+                        gameState.getEconomy().earn(resale);
+                        gameState.removeVehicle(v);
+                        showFeedback("Vehicle sold for $" + resale, Color.GREEN);
+                        return;
+                    }
+                }
+
+                // Handle vehicle route assignment clicks
                 for (int i = 0; i < vehicleAssignBtns.size(); i++) {
                     if (vehicleAssignBtns.get(i).contains(mx, my) && i < gameState.getVehicles().size()) {
                         if (gameState.getRoutes().isEmpty()) {
@@ -1205,6 +1299,132 @@ public class GameScreen implements Screen {
                     showRouteAssignDialog = false;
                     pendingVehicle = null;
                     return;
+                }
+            }
+        }
+    }
+
+    private void drawGarageDetailDialog() {
+        if (selectedGarageForDetails == null) return;
+
+        // 1. Filter vehicles belonging to this garage
+        List<Vehicle> parkedVehicles = gameState.getVehicles().stream()
+            .filter(v -> v.getHomeGarageLocation() != null &&
+                v.getHomeGarageLocation().equals(selectedGarageForDetails.getLocation()))
+            .toList();
+
+        float w = Gdx.graphics.getWidth();
+        float h = Gdx.graphics.getHeight();
+
+        float dW = 500f;
+        float dH = Math.max(200f, 100f + parkedVehicles.size() * 40f);
+        float dX = w / 2f - dW / 2f;
+        float dY = h / 2f - dH / 2f;
+        Rectangle rDialog = new Rectangle(dX, dY, dW, dH);
+
+        rGarageDetailClose = new Rectangle(dX + dW - 30f, dY + dH - 30f, 24f, 24f);
+
+        // Dim background overlay
+        Gdx.gl.glEnable(GL20.GL_BLEND);
+        Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
+        sr.begin(ShapeRenderer.ShapeType.Filled);
+        sr.setColor(0f, 0f, 0f, 0.68f);
+        sr.rect(0, 0, w, h);
+
+        // Dialog Box
+        sr.setColor(0.07f, 0.10f, 0.17f, 0.97f);
+        sr.rect(rDialog.x, rDialog.y, rDialog.width, rDialog.height);
+
+        // Top accent stripe
+        sr.setColor(0.20f, 0.47f, 0.80f, 1f);
+        sr.rect(rDialog.x, rDialog.y + rDialog.height - 4f, rDialog.width, 4f);
+
+        // Close button
+        sr.setColor(0.60f, 0.15f, 0.15f, 1f);
+        sr.rect(rGarageDetailClose.x, rGarageDetailClose.y, rGarageDetailClose.width, rGarageDetailClose.height);
+        sr.end();
+        Gdx.gl.glDisable(GL20.GL_BLEND);
+
+        // Text rendering
+        batch.begin();
+        font.setColor(Color.WHITE);
+        gl.setText(font, "X");
+        font.draw(batch, "X", rGarageDetailClose.x + (rGarageDetailClose.width - gl.width) / 2f,
+            rGarageDetailClose.y + (rGarageDetailClose.height + gl.height) / 2f);
+
+        // Header
+        font.getData().setScale(1.2f);
+        font.setColor(new Color(0.70f, 0.80f, 1.0f, 1f));
+        font.draw(batch, "Garage Details", dX + 16f, dY + dH - 16f);
+
+        // Capacity indicator
+        font.getData().setScale(1.0f);
+        Color capColor = parkedVehicles.size() >= Constants.GARAGE_CAPACITY ? new Color(0.9f, 0.4f, 0.4f, 1f) : new Color(0.50f, 0.90f, 0.55f, 1f);
+        font.setColor(capColor);
+        font.draw(batch, "Capacity: " + parkedVehicles.size() + " / " + Constants.GARAGE_CAPACITY, dX + 16f, dY + dH - 40f);
+        batch.end();
+
+        garageDetailSellBtns.clear();
+        float rowY = dY + dH - 85f;
+
+        // Draw Vehicles
+        for (int i = 0; i < parkedVehicles.size(); i++) {
+            Vehicle v = parkedVehicles.get(i);
+
+            sr.begin(ShapeRenderer.ShapeType.Filled);
+            sr.setColor(i % 2 == 0 ? new Color(0.12f, 0.16f, 0.24f, 1f) : new Color(0.15f, 0.19f, 0.29f, 1f));
+            sr.rect(dX + 16f, rowY, dW - 32f, 34f);
+            sr.end();
+
+            String displayName = GameController.VEHICLE_CATALOG.stream()
+                .filter(e -> e.type() == v.getType())
+                .map(GameController.VehicleCatalogEntry::displayName)
+                .findFirst().orElse(v.getType().toString());
+
+            batch.begin();
+            font.setColor(Color.WHITE);
+            font.draw(batch, displayName, dX + 24f, rowY + 22f);
+
+            String status = v.isMaintaining() ? "Maintaining..." : (v.isReturningToGarage() ? "Returning..." : "On Route");
+            font.setColor(new Color(0.7f, 0.7f, 0.7f, 1f));
+            font.draw(batch, status, dX + 160f, rowY + 22f);
+            batch.end();
+
+            Rectangle sellBtn = new Rectangle(dX + dW - 100f, rowY + 4f, 70f, 26f);
+            garageDetailSellBtns.add(sellBtn);
+            drawBtn(sellBtn, "Sell", new Color(0.65f, 0.25f, 0.25f, 1f));
+
+            rowY -= 38f;
+        }
+
+        if (parkedVehicles.isEmpty()) {
+            batch.begin();
+            font.setColor(new Color(0.6f, 0.6f, 0.6f, 1f));
+            font.draw(batch, "This garage is empty.", dX + 16f, rowY + 22f);
+            batch.end();
+        }
+
+        font.getData().setScale(1.4f); // Reset scale
+
+        // Input Handling
+        if (Gdx.input.isButtonJustPressed(Input.Buttons.LEFT)) {
+            float mx = Gdx.input.getX();
+            float my = Gdx.graphics.getHeight() - Gdx.input.getY();
+
+            if (rGarageDetailClose.contains(mx, my)) {
+                showGarageDetailDialog = false;
+                selectedGarageForDetails = null;
+                return;
+            }
+
+            for (int i = 0; i < garageDetailSellBtns.size(); i++) {
+                if (garageDetailSellBtns.get(i).contains(mx, my)) {
+                    Vehicle vToSell = parkedVehicles.get(i);
+                    long resale = vToSell.getResaleValue();
+                    gameState.getEconomy().earn(resale);
+                    gameState.removeVehicle(vToSell);
+                    showFeedback("Vehicle sold for $" + resale, Color.GREEN);
+                    return; // Will re-render next frame
                 }
             }
         }

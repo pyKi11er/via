@@ -48,11 +48,16 @@ public class RoadBuilder {
             }
         }
 
-        // Calculate and deduct cost
+        // Calculate cost
         int cost = map.getRoadBuildCost(coord, baseCost, clearingCostPerTree);
-        economy.deduct(cost);
 
-        // Clear forest
+        //Prevent instant bankruptcy
+        if (economy.getCapital() < cost) {
+            return false;
+        }
+
+        // Deduct cost and clear forest
+        economy.deduct(cost);
         tile.getTerrain().setForestLevel(Terrain.MIN_FOREST_LEVEL);
 
         // Place the road

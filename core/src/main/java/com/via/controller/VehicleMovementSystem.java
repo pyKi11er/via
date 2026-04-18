@@ -1,7 +1,6 @@
 package com.via.controller;
 
 import com.via.model.GameState;
-import com.via.model.building.City;
 import com.via.model.building.Road;
 import com.via.model.building.StopOverlay;
 import com.via.model.economy.Storage;
@@ -17,9 +16,17 @@ import java.util.*;
 
 public class VehicleMovementSystem {
 
-    private static final int   MAX_VEHICLES_PER_TILE = 2;
-    private static final float BASE_DELTA             = 0.016f;
-    private static final int   STOP_WAIT_TICKS        = 60; // ~1 second at normal speed
+    private static final int   MAX_VEHICLES_PER_TILE  = 2;
+    private static final float BASE_DELTA              = 0.016f;
+    private static final int   STOP_WAIT_TICKS         = 60;
+    // How many tiles ahead to scan for oncoming traffic before allowing overtake
+    private static final int   OVERTAKE_LOOK_AHEAD     = 3;
+    // Perpendicular pixel offset applied to sprite while overtaking (in tile units)
+    private static final float OVERTAKE_LANE_OFFSET    = 0.35f;
+    private static final float BLOCKED_SPEED_FACTOR = 0.3f; // 30% speed when stuck behind slower vehicle
+    // track progressive overtake acceleration per vehicle
+    private final java.util.Map<UUID, Float> overtakeRamp = new HashMap<>();
+
 
     private final EconomySystem economySystem;
 
@@ -27,7 +34,7 @@ public class VehicleMovementSystem {
     private final java.util.Map<UUID, Queue<TileCoord>>  pathCache = new HashMap<>();
 
     public VehicleMovementSystem(EconomySystem economySystem) {
-        this.economySystem = java.util.Objects.requireNonNull(economySystem, "economySystem");
+        this.economySystem = Objects.requireNonNull(economySystem, "economySystem");
     }
 
     public void tick(GameState state, float timeMultiplier) {
@@ -37,8 +44,10 @@ public class VehicleMovementSystem {
         Map map     = state.getMap();
 
         occupancy.clear();
-
         for (Vehicle v : state.getVehicles()) {
+            // This prevents the parked vehicle from causing a massive traffic jam.
+            if (v.isMaintaining()) continue;
+
             VehiclePosition pos = v.getPosition();
             if (pos == null) continue;
             markOccupied(pos.getOrigin(), v);
@@ -51,17 +60,45 @@ public class VehicleMovementSystem {
         }
     }
 
+    private TileCoord peekNextStep(Vehicle v) {
+        Queue<TileCoord> path = pathCache.get(v.getId());
+        if (path == null || path.isEmpty()) return null;
+        return path.peek();
+    }
+
     private void updateVehicleMovement(GameState state, Vehicle v,
                                        VehiclePosition pos, Map map, float delta) {
-        // Waiting at a stop
         if (v.getStopWaitTicks() > 0) {
-            v.setStopWaitTicks(v.getStopWaitTicks() - 1);
+            if (v.isMaintaining() && v.getStopWaitTicks() == 1) {
+                // Try to pay right before maintenance finishes
+                if (state.getEconomy().getCapital() >= v.getMaintenanceCost()) {
+                    state.getEconomy().deduct(v.getMaintenanceCost());
+                    v.rescheduleNextMaintenanceDueTick(state.getTimeState().getTick());
+                    v.setStopWaitTicks(0); // Automatically clears maintaining flag
+                } else {
+                    // Bankrupt! Freeze at 1 tick left. Vehicle stays off the road.
+                    return;
+                }
+            } else {
+                v.setStopWaitTicks(v.getStopWaitTicks() - 1);
+            }
             return;
         }
 
-        float speed       = v.getSpeed();
-        double slopeFactor = map.getVehicleSpeedMultiplier(pos.getOrigin(), pos.getDestination());
-        float appliedSpeed = (float)(speed * slopeFactor);
+        float baseSpeed   = v.getSpeed();
+        double slope      = map.getVehicleSpeedMultiplier(pos.getOrigin(), pos.getDestination());
+        float appliedSpeed = (float) (baseSpeed * slope);
+
+        // progressively ramp up speed if currently overtaking
+        if (pos.isOvertaking()) {
+            float ramp = overtakeRamp.getOrDefault(v.getId(), 1.0f);
+            ramp = ramp + delta * 4.0f; // smoothly increase up to 4×
+            overtakeRamp.put(v.getId(), ramp);
+            appliedSpeed *= ramp;
+        } else {
+            // reset ramp when not overtaking
+            overtakeRamp.remove(v.getId());
+        }
 
         float newProgress = pos.getProgress() + appliedSpeed * delta;
         if (newProgress < 1f) {
@@ -69,7 +106,10 @@ public class VehicleMovementSystem {
             return;
         }
 
-        // Arrived at destination tile
+        // Arrived — clear overtaking state at tile end
+        pos.setOvertaking(false);
+        overtakeRamp.remove(v.getId());
+
         pos.setOrigin(pos.getDestination());
         pos.setProgress(0f);
 
@@ -80,31 +120,148 @@ public class VehicleMovementSystem {
             v.advanceToNextStop();
             pathCache.remove(v.getId());
             v.setStopWaitTicks(STOP_WAIT_TICKS);
-            // fall through to compute next destination so the vehicle moves after wait
         }
 
         nextStop = v.getNextStop();
         if (nextStop == null) return;
 
-        // Only cache successful paths — never cache empty (failed) paths
         Queue<TileCoord> plannedPath = pathCache.get(v.getId());
         if (plannedPath == null || plannedPath.isEmpty()) {
             plannedPath = findPathBfs(map, pos.getOrigin(), nextStop.getLocation());
             if (!plannedPath.isEmpty()) {
                 pathCache.put(v.getId(), plannedPath);
-            } else {
+            }else{
                 return;
             }
         }
 
+        if (plannedPath.isEmpty()) return;
+
         TileCoord nextStep = plannedPath.peek();
         if (nextStep == null) return;
 
-        if (!canEnterTile(v, pos.getOrigin(), nextStep)) return;
+        if (!canEnterTile(v, pos.getOrigin(), nextStep)) {
+            if (canOvertake(state, v, pos, map, plannedPath)) {
+                // begin overtaking, start ramp at 1.0
+                startOvertake(v, pos, nextStep, map);
+                overtakeRamp.put(v.getId(), 1.0f);
+                markOccupied(nextStep, v);
+                pos.setDestination(nextStep);
+                plannedPath.poll();
+                pos.setProgress(Math.min(1f, pos.getProgress() + appliedSpeed * delta));
+                return;
+            }
+            return;
+        }
 
+        // Normal move
+        pos.setOvertaking(false);
+        overtakeRamp.remove(v.getId());
         markOccupied(nextStep, v);
         pos.setDestination(nextStep);
         plannedPath.poll();
+    }
+
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // Overtaking logic
+    // ══════════════════════════════════════════════════════════════════════════
+
+    /**
+     * Returns true if vehicle v is allowed to overtake right now.
+     * Conditions:
+     *   1. There is a slower vehicle immediately ahead blocking us.
+     *   2. The oncoming lane (opposite direction) is clear for OVERTAKE_LOOK_AHEAD tiles.
+     */
+    private boolean canOvertake(GameState state, Vehicle v, VehiclePosition pos,
+                                Map map, Queue<TileCoord> plannedPath) {
+        TileCoord nextStep = plannedPath.peek();
+        if (nextStep == null) return false;
+
+        // 1. Confirm there is a slower blocker ahead
+        Vehicle blocker = getBlockingVehicle(v, pos.getOrigin(), nextStep);
+        if (blocker == null || blocker.getSpeed() >= v.getSpeed()) return false;
+
+        // 2. Travel direction
+        int dx = nextStep.x - pos.getOrigin().x;
+        int dy = nextStep.y - pos.getOrigin().y;
+
+        // 3. Scan oncoming direction for traffic heading TOWARD us
+        TileCoord scan = pos.getOrigin();
+        for (int i = 0; i < OVERTAKE_LOOK_AHEAD; i++) {
+            scan = new TileCoord(scan.x - dx, scan.y - dy); // look behind (oncoming comes from there)
+            if (!map.isWithinBounds(scan)) break;
+            if (hasVehicleMovingIn(state, scan, dx, dy)) return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Marks the vehicle as overtaking and applies the visual lane offset
+     * perpendicular to its direction of travel.
+     */
+    private void startOvertake(Vehicle v, VehiclePosition pos,
+                               TileCoord nextStep, Map map) {
+        pos.setOvertaking(true);
+
+        int dx = nextStep.x - pos.getOrigin().x;
+        int dy = nextStep.y - pos.getOrigin().y;
+
+        // Perpendicular offset: if moving horizontally offset vertically, and vice-versa
+        // Positive offset = shift to the "left" of travel direction (oncoming lane side)
+        if (dx != 0) {
+            // Moving east/west — offset north (positive y)
+            pos.setLaneOffset(OVERTAKE_LANE_OFFSET);
+        } else {
+            // Moving north/south — offset east (positive x)
+            pos.setLaneOffset(OVERTAKE_LANE_OFFSET);
+        }
+    }
+
+    /**
+     * Returns the vehicle blocking entry into {@code to} from {@code from},
+     * or null if no blocker is found.
+     */
+    private Vehicle getBlockingVehicle(Vehicle mover, TileCoord from, TileCoord to) {
+        Set<Vehicle> occupants = occupancy.get(to);
+        if (occupants == null) return null;
+
+        int myDx = to.x - from.x;
+        int myDy = to.y - from.y;
+
+        for (Vehicle other : occupants) {
+            if (other == mover) continue;
+            VehiclePosition op = other.getPosition();
+            if (op == null) continue;
+
+            int opDx = op.getDestination().x - op.getOrigin().x;
+            int opDy = op.getDestination().y - op.getOrigin().y;
+
+            // Only block if moving in the same direction (not head-on)
+            boolean sameDir = (myDx == opDx && myDy == opDy)
+                || (opDx == 0 && opDy == 0); // stopped vehicle also blocks
+            if (sameDir) return other;
+        }
+        return null;
+    }
+
+    /**
+     * Returns true if any vehicle in the given tile is moving in direction (dx, dy)
+     * — i.e. it's oncoming traffic relative to the overtaker.
+     */
+    private boolean hasVehicleMovingIn(GameState state, TileCoord coord, int dx, int dy) {
+        Set<Vehicle> occupants = occupancy.get(coord);
+        if (occupants == null || occupants.isEmpty()) return false;
+        for (Vehicle other : occupants) {
+            VehiclePosition op = other.getPosition();
+            if (op == null) continue;
+            int vdx = op.getDestination().x - op.getOrigin().x;
+            int vdy = op.getDestination().y - op.getOrigin().y;
+            // Oncoming = moving in opposite direction to the overtaker
+            if (vdx == -dx && vdy == -dy) return true;
+        }
+        return false;
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -140,7 +297,7 @@ public class VehicleMovementSystem {
     }
 
     // ══════════════════════════════════════════════════════════════════════════
-    // BFS pathfinding — road tiles only
+    // BFS pathfinding
     // ══════════════════════════════════════════════════════════════════════════
 
     private Queue<TileCoord> findPathBfs(Map map, TileCoord start, TileCoord goal) {
@@ -178,21 +335,11 @@ public class VehicleMovementSystem {
         return path;
     }
 
-    /**
-     * Returns true if a vehicle can traverse this tile.
-     * Allows: Road tiles and City tiles (cities have internal road networks).
-     */
     private boolean isTraversable(Map map, TileCoord c) {
         Tile t = map.getTile(c);
         if (t == null) return false;
         Structure s = t.getStructure();
-        return s instanceof Road
-            || s instanceof com.via.model.building.City;
-    }
-
-    private boolean isRoadTile(Map map, TileCoord c) {
-        Tile t = map.getTile(c);
-        return t != null && t.getStructure() instanceof Road;
+        return s instanceof Road || s instanceof com.via.model.building.City;
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -206,15 +353,23 @@ public class VehicleMovementSystem {
     private boolean canEnterTile(Vehicle entrant, TileCoord from, TileCoord to) {
         Set<Vehicle> occupants = occupancy.get(to);
         if (occupants == null || occupants.isEmpty()) return true;
-        if (occupants.size() >= MAX_VEHICLES_PER_TILE) {
-            for (Vehicle other : occupants) {
-                TileCoord otherFrom = other.getPosition().getOrigin();
-                TileCoord otherTo   = other.getPosition().getDestination();
-                if (otherFrom.equals(to) && otherTo.equals(from)) return true;
-            }
+
+        for (Vehicle other : occupants) {
+            if (other == entrant) continue;
+            VehiclePosition op = other.getPosition();
+            if (op == null) continue;
+
+            // Allow head-on passing (opposite directions)
+            int myDx  = to.x - from.x;
+            int myDy  = to.y - from.y;
+            int opDx  = op.getDestination().x - op.getOrigin().x;
+            int opDy  = op.getDestination().y - op.getOrigin().y;
+            boolean headOn = (myDx == -opDx && myDy == -opDy);
+            if (headOn) continue;
+
+            // Same direction or stationary — block entry
             return false;
         }
         return true;
     }
-
 }

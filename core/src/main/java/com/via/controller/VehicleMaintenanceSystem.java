@@ -49,28 +49,64 @@ public class VehicleMaintenanceSystem {
                 continue;
             }
 
-            if (v.isReturningToGarage()) continue;
+            if (v.isReturningToGarage()) {
+                // Garage Demolition Safety Check
+                TileCoord target = v.getMaintenanceTargetCoord();
+                boolean garageExists = false;
+                for (TileCoord neighbor : map.getAdjacentCoords(target)) {
+                    if (isGarageTile(map, neighbor)) {
+                        garageExists = true;
+                        break;
+                    }
+                }
+
+                if (!garageExists) {
+                    // Abort maintenance! Garage was demolished.
+                    v.restoreAfterGarageReturn();
+                    v.setStopWaitTicks(0); // Cancel the pause
+                    v.rescheduleNextMaintenanceDueTick(currentTick); // Try again immediately
+                }
+                continue;
+            }
+
+
+            if (v.isMaintaining()) continue;
+
+            // Check if it's time for maintenance
             if (currentTick < v.getMaintenanceDueTick()) continue;
 
-            state.getEconomy().deduct(v.getMaintenanceCost());
-            v.rescheduleNextMaintenanceDueTick(currentTick);
+            //Route directly to the Home Garage
+            TileCoord homeLoc = v.getHomeGarageLocation();
+            if (homeLoc == null) continue;
 
-            GarageAccess access = findNearestGarageAccessTile(state, v.getPosition().getOrigin());
-            if (access == null) continue;
+            Tile garageTile = map.getTile(homeLoc);
+
+            // Safety check: Did the player demolish this vehicle's home garage?
+            // If yes, it skips maintenance and will eventually be auto-sold when it gets too old.
+            if (garageTile == null || !(garageTile.getStructure() instanceof Garage)) {
+                continue;
+            }
+
+            Garage homeGarage = (Garage) garageTile.getStructure();
+            List<TileCoord> accessRoads = homeGarage.getAccessRoadTiles(map);
+            if (accessRoads.isEmpty()) continue;
+
+            // Grab the road tile directly connected to the home garage
+            TileCoord accessRoadTile = accessRoads.get(0);
 
             StopOverlay garageStop = new StopOverlay(
                 "Garage",
-                access.accessRoadTile,
+                accessRoadTile,
                 new StopAccess(
                     AccessType.ROAD_TILE,
-                    access.garageTile,
-                    computeDirection(access.garageTile, access.accessRoadTile)
+                    homeLoc,
+                    computeDirection(homeLoc, accessRoadTile)
                 ),
-                new Storage()  // fix: never null
+                new Storage()
             );
 
             Route maintenanceRoute = new Route(List.of(garageStop));
-            v.enterGarageReturn(maintenanceRoute, access.accessRoadTile);
+            v.enterGarageReturn(maintenanceRoute, accessRoadTile);
         }
     }
 

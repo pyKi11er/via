@@ -204,7 +204,7 @@ public class WorldMapRenderer {
         if (c.contains(Direction.W)) key |= 1;
         return roadSprites[key];
     }
-
+    /*
     private void renderVehicles(List<Vehicle> vehicles) {
         for (Vehicle v : vehicles) {
             VehiclePosition pos = v.getPosition();
@@ -214,6 +214,46 @@ public class WorldMapRenderer {
             float sy = lerp(pos.getOrigin().y      * TILE_SIZE,
                 pos.getDestination().y * TILE_SIZE, pos.getProgress());
             draw(getVehicleSprite(v), sx, sy);
+        }
+    }
+    */
+    private void renderVehicles(List<Vehicle> vehicles) {
+        for (Vehicle v : vehicles) {
+            VehiclePosition pos = v.getPosition();
+            if (pos == null) continue;
+
+            if (v.isMaintaining()) {
+                // Draw translucent to indicate it is "inside" the garage being serviced
+                batch.setColor(1f, 1f, 1f, 0.4f);
+                draw(getVehicleSprite(v), pos.getOrigin().x * TILE_SIZE, pos.getOrigin().y * TILE_SIZE);
+                batch.setColor(1f, 1f, 1f, 1f); // reset color for other sprites
+                continue; // Skip the lane positioning logic
+            }
+
+            float sx = lerp(pos.getOrigin().x * TILE_SIZE,
+                pos.getDestination().x * TILE_SIZE, pos.getProgress());
+            float sy = lerp(pos.getOrigin().y * TILE_SIZE,
+                pos.getDestination().y * TILE_SIZE, pos.getProgress());
+
+            int dx = pos.getDestination().x - pos.getOrigin().x;
+            int dy = pos.getDestination().y - pos.getOrigin().y;
+
+            // Always place vehicle in right-hand lane based on direction
+            float normalOffset = TILE_SIZE * 0.20f;
+            float laneX = 0f, laneY = 0f;
+
+            if      (dx > 0) laneY = -normalOffset; // east  → south lane
+            else if (dx < 0) laneY =  normalOffset; // west  → north lane
+            else if (dy > 0) laneX =  normalOffset; // north → east lane
+            else if (dy < 0) laneX = -normalOffset; // south → west lane
+
+            // Overtaking: snap to opposite lane immediately, no animation
+            if (pos.isOvertaking()) {
+                laneX = -laneX;
+                laneY = -laneY;
+            }
+
+            draw(getVehicleSprite(v), sx + laneX, sy + laneY);
         }
     }
 

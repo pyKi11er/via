@@ -32,6 +32,9 @@ public abstract class Vehicle {
     private TileCoord maintenanceTargetCoord;
     private TileCoord homeGarageLocation;
 
+    private com.via.model.building.Parking parking;
+    private int parkedSlot = -1;
+
     protected Vehicle(
         VehicleType type,
         VehiclePosition position,
@@ -90,9 +93,22 @@ public abstract class Vehicle {
     public long getPurchaseCost() { return purchaseCost; }
     public Route getAssignedRoute() { return assignedRoute; }
 
+    public com.via.model.building.Parking getParking() { return parking; }
+    public int getParkedSlot() { return parkedSlot; }
+
+    public void setParkingSlot(com.via.model.building.Parking parking, int slot) {
+        this.parking = parking;
+        this.parkedSlot = slot;
+    }
+
     public void assignRoute(Route route) {
         this.assignedRoute = route;
         this.routeStopIndex = 0;
+        if (this.parking != null && this.parkedSlot >= 0) {
+            this.parking.freeSlot(this.parkedSlot);
+            this.parking = null;
+            this.parkedSlot = -1;
+        }
     }
 
     public int getRouteStopIndex() { return routeStopIndex; }

@@ -23,6 +23,7 @@ public class MapInitializer {
     private static final TileCoord STEEL_MILL_ORIGIN = new TileCoord(18, 20);
     private static final TileCoord CITY_A_ORIGIN = new TileCoord(28, 19);
     private static final TileCoord GARAGE_ORIGIN     = new TileCoord(6,  16);
+    private static final TileCoord PARKING_ORIGIN    = new TileCoord(4,  14);
 
     private static final int ROAD_Y = 17;
 
@@ -54,6 +55,9 @@ public class MapInitializer {
 
         // 3. Build road network
         buildRoads(map);
+
+        // Pre-built parking lot next to the garage
+        buildParking(map, state);
 
         // 4. Place stops
         StopOverlay mineStop   = placeStop(map, "Mine Stop",       new TileCoord(3,  19));
@@ -152,6 +156,27 @@ public class MapInitializer {
         for (int y = ROAD_Y + 1; y <= 19; y++) placeRoad(map, 19, y);
         placeRoad(map, 29, ROAD_Y);
         placeRoad(map, 29, ROAD_Y + 1);
+
+        // Parking loop roads: rectangle around the parking area at (4,14)-(5,15)
+        for (int y = 13; y <= 16; y++) placeRoad(map, 3, y); // left side
+        for (int y = 13; y <= 15; y++) placeRoad(map, 6, y); // right side (below garage)
+        placeRoad(map, 4, 13);                                // bottom connector
+        placeRoad(map, 5, 13);
+    }
+
+    private static void buildParking(Map map, GameState state) {
+        com.via.model.building.Parking parking =
+            new com.via.model.building.Parking(
+                new com.via.model.building.Footprint(PARKING_ORIGIN, 2, 2));
+        stampBuilding(map, parking);
+        state.addBuilding(parking);
+
+        for (Building b : state.getBuildings()) {
+            if (b instanceof com.via.model.building.Garage g) {
+                g.setParking(parking);
+                break;
+            }
+        }
     }
 
     private static void placeRoad(Map map, int x, int y) {

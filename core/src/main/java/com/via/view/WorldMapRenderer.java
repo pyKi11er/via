@@ -43,6 +43,7 @@ public class WorldMapRenderer {
     private final TextureRegion texCityTile;
     private final TextureRegion texFacilityTile;
     private final TextureRegion texGarageTile;
+    private final Texture       texParkingFull; // 64x64 drawn across 2x2 tiles
     // Overlays
     private final TextureRegion texStop;
 
@@ -72,7 +73,8 @@ public class WorldMapRenderer {
 
         texCityTile     = load("buildings/city_tile.png",     fallbackTiles[2][0]);
         texFacilityTile = load("buildings/facility_tile.png", fallbackTiles[3][4]);
-        texGarageTile = load("buildings/garage_tile.png", fallbackTiles[3][9]);
+        texGarageTile   = load("buildings/garage_tile.png",   fallbackTiles[3][9]);
+        texParkingFull  = loadFullTexture("buildings/parking_tile.png");
         texStop         = load("overlays/stop.png",           fallbackTiles[7][4]);
 
         truckSprites[0] = load("vehicles/truck_n.png", fallbackTiles[9][8]);
@@ -155,19 +157,38 @@ public class WorldMapRenderer {
         batch.end();
     }
     private void renderTiles(Map map) {
+        // Pass 1: terrain + non-parking structures + overlays
         for (int x = 0; x < map.size.width; x++) {
             for (int y = 0; y < map.size.height; y++) {
                 TileCoord coord = new TileCoord(x, y);
                 Tile tile = map.getTile(coord);
                 if (tile == null) continue;
                 float sx = x * TILE_SIZE, sy = y * TILE_SIZE;
-
-                draw(getTerrainTexture(tile.getTerrain()), sx, sy);
-
-                if (tile.getStructure() != null)
+                // Skip terrain for parking tiles — parking texture covers it fully
+                if (!(tile.getStructure() instanceof com.via.model.building.Parking)) {
+                    draw(getTerrainTexture(tile.getTerrain()), sx, sy);
+                }
+                if (tile.getStructure() != null
+                        && !(tile.getStructure() instanceof com.via.model.building.Parking)) {
                     draw(getStructureTexture(tile.getStructure(), map), sx, sy);
+                }
                 if (tile.getOverlay() != null)
                     draw(getOverlayTexture(tile.getOverlay()), sx, sy);
+            }
+        }
+
+        // Pass 2: draw each parking lot's 64×64 texture on top of terrain
+        java.util.Set<com.via.model.building.Parking> drawn = new java.util.HashSet<>();
+        for (int x = 0; x < map.size.width; x++) {
+            for (int y = 0; y < map.size.height; y++) {
+                Tile tile = map.getTile(new TileCoord(x, y));
+                if (tile == null || !(tile.getStructure() instanceof com.via.model.building.Parking p)) continue;
+                if (drawn.add(p) && texParkingFull != null) {
+                    TileCoord o = p.getFootprint().getOrigin();
+                    batch.draw(texParkingFull,
+                        o.x * TILE_SIZE, o.y * TILE_SIZE,
+                        TILE_SIZE * 2, TILE_SIZE * 2);
+                }
             }
         }
     }
@@ -209,11 +230,17 @@ public class WorldMapRenderer {
         for (Vehicle v : vehicles) {
             VehiclePosition pos = v.getPosition();
             if (pos == null) continue;
-            float sx = lerp(pos.getOrigin().x      * TILE_SIZE,
-                pos.getDestination().x * TILE_SIZE, pos.getProgress());
-            float sy = lerp(pos.getOrigin().y      * TILE_SIZE,
-                pos.getDestination().y * TILE_SIZE, pos.getProgress());
-            draw(getVehicleSprite(v), sx, sy);
+
+            if (v.getParking() != null && v.getParkedSlot() >= 0) {
+                float[] slotPos = v.getParking().getSlotWorldPos(v.getParkedSlot());
+                batch.draw(getVehicleSprite(v), slotPos[0], slotPos[1], 16, 16);
+            } else {
+                float sx = lerp(pos.getOrigin().x * TILE_SIZE,
+                    pos.getDestination().x * TILE_SIZE, pos.getProgress());
+                float sy = lerp(pos.getOrigin().y * TILE_SIZE,
+                    pos.getDestination().y * TILE_SIZE, pos.getProgress());
+                draw(getVehicleSprite(v), sx, sy);
+            }
         }
     }
     */
@@ -221,6 +248,12 @@ public class WorldMapRenderer {
         for (Vehicle v : vehicles) {
             VehiclePosition pos = v.getPosition();
             if (pos == null) continue;
+
+            if (v.getParking() != null && v.getParkedSlot() >= 0) {
+                float[] slotPos = v.getParking().getSlotWorldPos(v.getParkedSlot());
+                batch.draw(getVehicleSprite(v), slotPos[0], slotPos[1], 16, 16);
+                continue;
+            }
 
             if (v.isMaintaining()) {
                 // Draw translucent to indicate it is "inside" the garage being serviced
@@ -294,7 +327,17 @@ public class WorldMapRenderer {
             ownedTextures.add(t);
             return new TextureRegion(t);
         }
-        return fallback; // specific slice, NOT the whole sheet
+        return fallback;
+    }
+
+    private Texture loadFullTexture(String path) {
+        if (Gdx.files.internal(path).exists()) {
+            Texture t = new Texture(Gdx.files.internal(path));
+            t.setFilter(Texture.TextureFilter.Nearest, Texture.TextureFilter.Nearest);
+            ownedTextures.add(t);
+            return t;
+        }
+        return null;
     }
 
     // -------------------------------------------------------------------------

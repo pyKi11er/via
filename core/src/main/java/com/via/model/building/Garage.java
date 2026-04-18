@@ -15,9 +15,14 @@ import java.util.Set;
  */
 public class Garage extends Building {
 
+    private Parking parking;
+
     public Garage(Footprint footprint) {
         super(footprint);
     }
+
+    public Parking getParking() { return parking; }
+    public void setParking(Parking parking) { this.parking = parking; }
 
     /**
      * Returns road tiles adjacent to any tile covered by the garage footprint.

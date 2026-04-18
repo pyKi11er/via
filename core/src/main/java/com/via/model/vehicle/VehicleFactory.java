@@ -22,16 +22,16 @@ public class VehicleFactory {
         Map map = state.getMap();
         if (map == null) throw new IllegalStateException("state.map must not be null");
 
-        // FIX: Vehicles must spawn on the road, not inside the building tile, or BFS will fail.
+        com.via.model.building.Parking parking = garage.getParking();
+        int slot = parking != null ? parking.findFreeSlot() : -1;
+
+        // Always spawn on a road tile so the movement system can navigate
         List<TileCoord> accessRoads = garage.getAccessRoadTiles(map);
-        if (accessRoads.isEmpty()) {
+        if (accessRoads.isEmpty())
             throw new IllegalStateException("Garage has no adjacent road to spawn vehicle on.");
-        }
+        TileCoord spawnTile = accessRoads.get(0);
 
-        TileCoord origin = accessRoads.get(0);
-        TileCoord destination = origin; // Will update on the first movement tick
-
-        VehiclePosition pos = new VehiclePosition(origin, destination);
+        VehiclePosition pos = new VehiclePosition(spawnTile, spawnTile);
         Vehicle v = switch (type) {
             case TRUCK        -> new SmallTruck(pos);
             case BUS          -> new MidiBus(pos);
@@ -49,6 +49,11 @@ public class VehicleFactory {
         v.onPurchased(purchaseTick);
 
         v.setHomeGarageLocation(garage.getLocation());
+
+        if (parking != null && slot >= 0) {
+            parking.occupySlot(slot, v.getId());
+            v.setParkingSlot(parking, slot);
+        }
 
         state.addVehicle(v);
         return v;

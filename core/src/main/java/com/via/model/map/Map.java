@@ -3,27 +3,56 @@ package com.via.model.map;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Represents the game map consisting of a grid of tiles.
+ * Handles tile management, terrain operations, road construction,
+ and vehicle movement logic.
+ */
 public class Map {
     private static final double UPHILL_ONE_LEVEL_SPEED_MULTIPLIER = 0.75;
     private static final int MAX_ROAD_HEIGHT_DIFFERENCE = 1;
     private static final int MAX_TERRAFORM_ADJACENT_DIFFERENCE = 2;
 
+    /** The dimensions of the map grid. */
     public final GridSize size;
     private final Tile[][] tiles;
 
+    /**
+     * Constructs a new Map with the specified size.
+     *
+     * @param size the dimensions of the map (width and height)
+     */
     public Map(GridSize size) {
         this.size = size;
         this.tiles = new Tile[size.width][size.height];
     }
 
+    /**
+     * Returns the tile at the specified coordinates.
+     *
+     * @param coord the coordinates of the tile
+     * @return the tile at the given coordinates, or null if not set
+     */
     public Tile getTile(TileCoord coord) {
         return tiles[coord.x][coord.y];
     }
 
+    /**
+     * Sets a tile at the specified coordinates.
+     *
+     * @param tile  the tile to place
+     * @param coord the coordinates where to place the tile
+     */
     public void setTile(Tile tile, TileCoord coord) {
         tiles[coord.x][coord.y] = tile;
     }
 
+    /**
+     * Checks whether the given coordinates are within map bounds.
+     *
+     * @param coord the coordinates to check
+     * @return true if the coordinates are within bounds, false otherwise
+     */
     public boolean isWithinBounds(TileCoord coord) {
         return coord != null
             && coord.x >= 0
@@ -32,6 +61,13 @@ public class Map {
             && coord.y < size.height;
     }
 
+    /**
+     * Checks whether two tiles are adjacent (sharing a side, not diagonal).
+     *
+     * @param first  the first tile coordinates
+     * @param second the second tile coordinates
+     * @return true if the tiles are adjacent, false otherwise
+     */
     public boolean areAdjacent(TileCoord first, TileCoord second) {
         if (!isWithinBounds(first) || !isWithinBounds(second)) {
             return false;
@@ -42,6 +78,12 @@ public class Map {
         return dx + dy == 1;
     }
 
+    /**
+     * Returns a list of all adjacent tile coordinates (north, east, south, west).
+     *
+     * @param coord the reference tile coordinates
+     * @return a list of valid adjacent coordinates within map bounds
+     */
     public List<TileCoord> getAdjacentCoords(TileCoord coord) {
         List<TileCoord> adjacent = new ArrayList<>();
 
@@ -58,6 +100,14 @@ public class Map {
         return adjacent;
     }
 
+    /**
+     * Calculates the absolute terrain level difference between two tiles.
+     *
+     * @param first  the first tile coordinates
+     * @param second the second tile coordinates
+     * @return the absolute height difference
+     * @throws IllegalArgumentException if either coordinate is out of bounds or tile uninitialized
+     */
     public int getHeightDifference(TileCoord first, TileCoord second) {
         Tile firstTile = getRequiredTile(first);
         Tile secondTile = getRequiredTile(second);
@@ -67,6 +117,13 @@ public class Map {
         );
     }
 
+    /**
+     * Checks whether a road can be built between two adjacent tiles.
+     *
+     * @param first  the first tile coordinates
+     * @param second the second tile coordinates
+     * @return true if the tiles are adjacent and height difference is within limits
+     */
     public boolean canBuildRoadBetween(TileCoord first, TileCoord second) {
         if (!areAdjacent(first, second)) {
             return false;
@@ -75,6 +132,13 @@ public class Map {
         return getHeightDifference(first, second) <= MAX_ROAD_HEIGHT_DIFFERENCE;
     }
 
+    /**
+     * Validates road construction between two tiles, throwing exceptions if invalid.
+     *
+     * @param first  the first tile coordinates
+     * @param second the second tile coordinates
+     * @throws IllegalArgumentException if tiles are not adjacent or height difference exceeds limit
+     */
     public void validateRoadBuildBetween(TileCoord first, TileCoord second) {
         if (!areAdjacent(first, second)) {
             throw new IllegalArgumentException("Road can only be built between adjacent tiles");
@@ -88,6 +152,13 @@ public class Map {
         }
     }
 
+    /**
+     * Checks whether a tile can be terraformed by the specified delta.
+     *
+     * @param coord the tile coordinates
+     * @param delta the terrain level change (-1 for lower, +1 for raise)
+     * @return true if terraforming is allowed, false otherwise
+     */
     public boolean canTerraform(TileCoord coord, int delta) {
         if (!isWithinBounds(coord)) {
             return false;
@@ -114,6 +185,15 @@ public class Map {
         return true;
     }
 
+    /**
+     * Performs terraforming on a tile, changing its terrain level.
+     *
+     * @param coord        the tile coordinates
+     * @param delta        the terrain level change (-1 or +1)
+     * @param costPerLevel the cost per level of terraforming
+     * @return the total cost of the operation
+     * @throws IllegalArgumentException if costPerLevel is negative or terraforming is not allowed
+     */
     public int terraform(TileCoord coord, int delta, int costPerLevel) {
         if (costPerLevel < 0) {
             throw new IllegalArgumentException("costPerLevel must not be negative");
@@ -130,6 +210,15 @@ public class Map {
         return Math.abs(delta) * costPerLevel;
     }
 
+    /**
+     * Calculates the cost to build a road on a tile, including forest clearing costs.
+     *
+     * @param coord              the tile coordinates
+     * @param baseCost           the base road construction cost
+     * @param clearingCostPerTree the cost to clear each tree
+     * @return the total road building cost
+     * @throws IllegalArgumentException if any cost parameter is negative
+     */
     public int getRoadBuildCost(TileCoord coord, int baseCost, int clearingCostPerTree) {
         if (baseCost < 0) {
             throw new IllegalArgumentException("baseCost must not be negative");
@@ -143,6 +232,14 @@ public class Map {
         return baseCost + (forestLevel * clearingCostPerTree);
     }
 
+    /**
+     * Clears forest from a tile for road construction and returns the total cost.
+     *
+     * @param coord              the tile coordinates
+     * @param baseCost           the base road construction cost
+     * @param clearingCostPerTree the cost to clear each tree
+     * @return the total cost for clearing and road construction
+     */
     public int clearForestForRoad(TileCoord coord, int baseCost, int clearingCostPerTree) {
         Tile tile = getRequiredTile(coord);
         int cost = getRoadBuildCost(coord, baseCost, clearingCostPerTree);
@@ -150,6 +247,14 @@ public class Map {
         return cost;
     }
 
+    /**
+     * Returns the speed multiplier for a vehicle moving between two adjacent tiles.
+     * Moving uphill reduces speed; downhill and flat movement have normal speed.
+     *
+     * @param from the starting tile coordinates
+     * @param to   the destination tile coordinates
+     * @return the speed multiplier (1.0 for flat/downhill, 0.75 for uphill)
+     */
     public double getVehicleSpeedMultiplier(TileCoord from, TileCoord to) {
         if (!areAdjacent(from, to)) {
             return 1.0;
@@ -165,6 +270,14 @@ public class Map {
         return 1.0;
     }
 
+    /**
+     * Retrieves a tile, throwing an exception if it doesn't exist or is out of bounds.
+     *
+     * @param coord the tile coordinates
+     * @return the tile at the specified coordinates
+     * @throws IllegalArgumentException if coordinates are out of bounds
+     * @throws IllegalStateException    if the tile has not been initialized
+     */
     private Tile getRequiredTile(TileCoord coord) {
         if (!isWithinBounds(coord)) {
             throw new IllegalArgumentException("Tile coordinate is out of bounds");

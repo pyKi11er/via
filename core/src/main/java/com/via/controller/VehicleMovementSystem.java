@@ -14,6 +14,19 @@ import com.via.model.vehicle.*;
 
 import java.util.*;
 
+/**
+ * Manages the movement, pathfinding, overtaking, and stop behavior of all vehicles in the game.
+ * <p>
+ * This system handles:
+ * <ul>
+ *   <li>Tile-based movement with progress interpolation</li>
+ *   <li>Real-time pathfinding using BFS</li>
+ *   <li>Overtaking logic with oncoming traffic detection</li>
+ *   <li>Stop waiting behavior (loading/unloading and maintenance)</li>
+ *   <li>Tile occupancy and collision prevention</li>
+ * </ul>
+ */
+
 public class VehicleMovementSystem {
 
     private static final int   MAX_VEHICLES_PER_TILE  = 2;
@@ -32,11 +45,22 @@ public class VehicleMovementSystem {
 
     private final java.util.Map<TileCoord, Set<Vehicle>> occupancy = new HashMap<>();
     private final java.util.Map<UUID, Queue<TileCoord>>  pathCache = new HashMap<>();
-
+    /**
+     * Creates a new VehicleMovementSystem.
+     *
+     * @param economySystem the economy system used for processing cargo transactions
+     */
     public VehicleMovementSystem(EconomySystem economySystem) {
         this.economySystem = Objects.requireNonNull(economySystem, "economySystem");
     }
-
+    /**
+     * Updates movement for all vehicles in the game.
+     * <p>
+     * This is the main update method called every game tick.
+     *
+     * @param state          current game state
+     * @param timeMultiplier multiplier for variable timestep support
+     */
     public void tick(GameState state, float timeMultiplier) {
         if (state == null || state.isGameOver()) return;
 
@@ -59,13 +83,17 @@ public class VehicleMovementSystem {
             updateVehicleMovement(state, v, pos, map, delta);
         }
     }
-
+    /**
+     * Returns the next tile the vehicle plans to move into, without removing it from the path.
+     */
     private TileCoord peekNextStep(Vehicle v) {
         Queue<TileCoord> path = pathCache.get(v.getId());
         if (path == null || path.isEmpty()) return null;
         return path.peek();
     }
-
+    /**
+     * Updates movement logic for a single vehicle.
+     */
     private void updateVehicleMovement(GameState state, Vehicle v,
                                        VehiclePosition pos, Map map, float delta) {
         if (v.getStopWaitTicks() > 0) {
@@ -267,14 +295,18 @@ public class VehicleMovementSystem {
     // ══════════════════════════════════════════════════════════════════════════
     // Cargo
     // ══════════════════════════════════════════════════════════════════════════
-
+    /**
+     * Unloads cargo at a stop and processes economy transactions.
+     */
     private void unloadAtStop(GameState state, Vehicle v, StopOverlay stop) {
         Cargo cargo = v.getCargo();
         if (cargo == null || cargo.getAmount() <= 0) return;
         economySystem.processVehicleUnload(state, stop, cargo);
         v.setCargo(null);
     }
-
+    /**
+     * Loads appropriate cargo from a stop (passengers for buses, goods otherwise).
+     */
     private void loadFromStop(Vehicle v, StopOverlay stop) {
         Storage storage = stop.getStorage();
         if (storage == null) return;
@@ -299,7 +331,11 @@ public class VehicleMovementSystem {
     // ══════════════════════════════════════════════════════════════════════════
     // BFS pathfinding
     // ══════════════════════════════════════════════════════════════════════════
-
+    /**
+     * Finds a path from start to goal using Breadth-First Search.
+     *
+     * @return a queue containing the path (excluding the start tile), or empty queue if no path exists
+     */
     private Queue<TileCoord> findPathBfs(Map map, TileCoord start, TileCoord goal) {
         if (start.equals(goal)) return new LinkedList<>();
 
@@ -349,7 +385,11 @@ public class VehicleMovementSystem {
     private void markOccupied(TileCoord coord, Vehicle v) {
         occupancy.computeIfAbsent(coord, k -> new HashSet<>()).add(v);
     }
-
+    /**
+     * Checks whether a vehicle can enter a target tile.
+     * <p>
+     * Allows head-on passing but blocks same-direction or stationary vehicles.
+     */
     private boolean canEnterTile(Vehicle entrant, TileCoord from, TileCoord to) {
         Set<Vehicle> occupants = occupancy.get(to);
         if (occupants == null || occupants.isEmpty()) return true;

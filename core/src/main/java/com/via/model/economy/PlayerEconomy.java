@@ -1,5 +1,6 @@
 package com.via.model.economy;
 
+import java.io.Serializable;
 import com.via.model.Constants;
 
 /**
@@ -9,7 +10,8 @@ import com.via.model.Constants;
  * It enforces non-negative transaction amounts and provides both modern
  * and backwards-compatible methods for capital changes.
  */
-public class PlayerEconomy {
+public class PlayerEconomy implements Serializable {
+    private static final long serialVersionUID = 1L;
 
     /** The player's current capital / money */
     private long capital;

@@ -1,5 +1,6 @@
 package com.via.model.building;
 
+import java.io.Serializable;
 import com.via.model.enums.AccessType;
 import com.via.model.enums.Direction;
 import com.via.model.map.TileCoord;
@@ -10,7 +11,8 @@ import com.via.model.map.TileCoord;
  * Each StopAccess defines how vehicles can enter or exit a stop from a specific
  * road tile, including the type of access and the direction of movement.
  */
-public class StopAccess {
+public class StopAccess implements Serializable {
+    private static final long serialVersionUID = 1L;
 
     /** The type of access (e.g., entry, exit, bidirectional) */
     private final AccessType accessType;

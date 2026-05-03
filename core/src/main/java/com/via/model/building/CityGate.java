@@ -1,5 +1,6 @@
 package com.via.model.building;
 
+import java.io.Serializable;
 import com.via.model.enums.Direction;
 import com.via.model.map.TileCoord;
 
@@ -9,7 +10,8 @@ import com.via.model.map.TileCoord;
  * Each gate defines a specific location and direction, which is used for
  * connecting the city's internal road network to the external road system.
  */
-public class CityGate {
+public class CityGate implements Serializable {
+    private static final long serialVersionUID = 1L;
 
     /** The tile coordinate where this gate is located */
     private final TileCoord location;

@@ -1,5 +1,6 @@
 package com.via.model;
 
+import java.io.Serializable;
 import com.via.model.building.Building;
 import com.via.model.economy.PlayerEconomy;
 import com.via.model.economy.TimeState;
@@ -15,7 +16,8 @@ import java.util.List;
  * Holds references to the map, vehicles, routes, buildings, economy, and time state.
  * Acts as the central data container for the simulation.
  */
-public class GameState {
+public class GameState implements Serializable {
+    private static final long serialVersionUID = 1L;
     private Map map;
     private List<Vehicle> vehicles;
     private List<Route> routes;

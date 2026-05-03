@@ -1,5 +1,6 @@
 package com.via.model.vehicle;
 
+import java.io.Serializable;
 import com.via.model.map.TileCoord;
 
 /**
@@ -7,7 +8,8 @@ import com.via.model.map.TileCoord;
  * Tracks the origin and destination tiles, progress along the path, and visual
  * state for overtaking maneuvers including lane offset.
  */
-public class VehiclePosition {
+public class VehiclePosition implements Serializable {
+    private static final long serialVersionUID = 1L;
     private TileCoord origin;
     private TileCoord destination;
     private float progress;

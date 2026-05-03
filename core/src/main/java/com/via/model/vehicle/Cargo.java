@@ -1,12 +1,14 @@
 package com.via.model.vehicle;
 
+import java.io.Serializable;
 import com.via.model.enums.GoodType;
 
 /**
  * Represents a cargo load consisting of a specific good type and quantity.
  * Used by vehicles to transport goods between stations.
  */
-public class Cargo {
+public class Cargo implements Serializable {
+    private static final long serialVersionUID = 1L;
     private GoodType type;
     private int amount;
 

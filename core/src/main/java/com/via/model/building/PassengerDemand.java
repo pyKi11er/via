@@ -1,5 +1,7 @@
 package com.via.model.building;
 
+import java.io.Serializable;
+
 /**
  * Represents the passenger generation rate of a {@link City}.
  * <p>
@@ -7,7 +9,8 @@ package com.via.model.building;
  * at a city. It can be adjusted dynamically to simulate population
  * growth, events, or varying demand levels.
  */
-public class PassengerDemand {
+public class PassengerDemand implements Serializable {
+    private static final long serialVersionUID = 1L;
 
     /** Passengers generated per tick by this city */
     private float ratePerTick;

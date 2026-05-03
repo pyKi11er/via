@@ -1,10 +1,13 @@
 package com.via.model.economy;
 
+import java.io.Serializable;
+
 /**
  * Represents the time state of the economy system.
  * Tracks the current tick count, which advances over time.
  */
-public class TimeState {
+public class TimeState implements Serializable {
+    private static final long serialVersionUID = 1L;
     private long tick;
 
     /**

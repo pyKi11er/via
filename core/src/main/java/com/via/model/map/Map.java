@@ -1,5 +1,6 @@
 package com.via.model.map;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -8,7 +9,8 @@ import java.util.List;
  * Handles tile management, terrain operations, road construction,
  and vehicle movement logic.
  */
-public class Map {
+public class Map implements Serializable {
+    private static final long serialVersionUID = 1L;
     private static final double UPHILL_ONE_LEVEL_SPEED_MULTIPLIER = 0.75;
     private static final int MAX_ROAD_HEIGHT_DIFFERENCE = 1;
     private static final int MAX_TERRAFORM_ADJACENT_DIFFERENCE = 2;

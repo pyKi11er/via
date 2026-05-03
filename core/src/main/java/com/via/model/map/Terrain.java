@@ -1,12 +1,14 @@
 package com.via.model.map;
 
+import java.io.Serializable;
 import java.util.Objects;
 
 /**
  * Represents the terrain properties of a tile in the game map.
  * Encapsulates terrain type, elevation level, and forest density.
  */
-public class Terrain {
+public class Terrain implements Serializable {
+    private static final long serialVersionUID = 1L;
     /** The minimum forest level (no forest). */
     public static final int MIN_FOREST_LEVEL = 0;
 

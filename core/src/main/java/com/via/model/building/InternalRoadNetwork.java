@@ -1,5 +1,6 @@
 package com.via.model.building;
 
+import java.io.Serializable;
 import com.via.model.map.TileCoord;
 
 import java.util.ArrayList;
@@ -12,7 +13,8 @@ import java.util.List;
  * and maintains the list of entry/exit points (gates) that connect the city
  * to the external road network.
  */
-public class InternalRoadNetwork {
+public class InternalRoadNetwork implements Serializable {
+    private static final long serialVersionUID = 1L;
 
     /** All tiles that are part of the city's internal road network */
     private final List<TileCoord> roadTiles;

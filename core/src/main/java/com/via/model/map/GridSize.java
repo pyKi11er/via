@@ -1,10 +1,13 @@
 package com.via.model.map;
 
+import java.io.Serializable;
+
 /**
  * Represents the dimensions of a grid-based map.
  * Encapsulates the width and height as immutable values.
  */
-public class GridSize {
+public class GridSize implements Serializable {
+    private static final long serialVersionUID = 1L;
     /** The width of the grid (number of columns). */
     public final int width;
 

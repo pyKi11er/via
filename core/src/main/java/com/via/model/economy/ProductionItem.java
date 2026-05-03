@@ -1,5 +1,6 @@
 package com.via.model.economy;
 
+import java.io.Serializable;
 import com.via.model.enums.GoodType;
 
 /**
@@ -7,7 +8,8 @@ import com.via.model.enums.GoodType;
  * <p>
  * Defines one type of good and the quantity produced per production cycle.
  */
-public class ProductionItem {
+public class ProductionItem implements Serializable {
+    private static final long serialVersionUID = 1L;
 
     /** The type of good being produced */
     public final GoodType type;

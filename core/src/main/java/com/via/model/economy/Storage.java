@@ -1,5 +1,6 @@
 package com.via.model.economy;
 
+import java.io.Serializable;
 import com.via.model.enums.GoodType;
 
 import java.util.HashMap;
@@ -12,7 +13,8 @@ import java.util.Map;
  * inventories of different {@link GoodType}s. This class enforces valid
  * operations (non-negative amounts, sufficient stock for removals).
  */
-public class Storage {
+public class Storage implements Serializable {
+    private static final long serialVersionUID = 1L;
 
     /** Maps each good type to its current stored quantity */
     private Map<GoodType, Integer> contents;

@@ -1,5 +1,6 @@
 package com.via.model.vehicle;
 
+import java.io.Serializable;
 import com.via.model.building.StopOverlay;
 import com.via.model.Constants;
 import com.via.model.enums.VehicleType;
@@ -12,7 +13,8 @@ import java.util.UUID;
  * Manages vehicle state including position, route assignment, cargo, maintenance,
  * and garage operations. All vehicle types extend this class.
  */
-public abstract class Vehicle {
+public abstract class Vehicle implements Serializable {
+    private static final long serialVersionUID = 1L;
     private final UUID id;
     private final VehicleType type;
     private VehiclePosition position;

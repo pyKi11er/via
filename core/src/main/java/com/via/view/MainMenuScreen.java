@@ -16,6 +16,7 @@ import com.badlogic.gdx.math.Rectangle;
 import com.via.VIA;
 import com.via.controller.GameEngine;
 import com.via.controller.MapInitializer;
+import com.via.controller.SaveManager;
 import com.via.model.Constants;
 import com.via.model.GameState;
 import com.via.model.vehicle.Vehicle;
@@ -50,6 +51,10 @@ public class MainMenuScreen extends InputAdapter implements Screen {
     // ── Dialog state
     private enum Dialog { NONE, NEW_GAME, LOAD_GAME, ABOUT, HELP, EXIT, SETTINGS }
     private Dialog dialog = Dialog.NONE;
+
+    // ── Load game state
+    private String[] saveFiles = new String[0];
+    private final java.util.List<Rectangle> rSaveEntries = new java.util.ArrayList<>();
 
     private boolean showResolutionDropdown = false;
     private java.util.List<com.badlogic.gdx.Graphics.DisplayMode> cachedModes = new java.util.ArrayList<>();
@@ -428,8 +433,21 @@ public class MainMenuScreen extends InputAdapter implements Screen {
 
             case LOAD_GAME:
                 drawCentered(buttonFont, "Load Game", cx, hTY, Color.WHITE);
-                drawCentered(smallFont, "No save files found.", cx,
-                        rDialog.y + rDialog.height * 0.56f, new Color(0.90f, 0.93f, 1f, 1f));
+                rSaveEntries.clear();
+                if (saveFiles.length == 0) {
+                    drawCentered(smallFont, "No save files found.", cx,
+                            rDialog.y + rDialog.height * 0.56f, new Color(0.90f, 0.93f, 1f, 1f));
+                } else {
+                    float entryH = rDialog.height * 0.10f;
+                    float entryW = rDialog.width * 0.80f;
+                    float entryX = rDialog.x + (rDialog.width - entryW) * 0.5f;
+                    float startY = rDialog.y + rDialog.height * 0.76f;
+                    for (int i = 0; i < saveFiles.length; i++) {
+                        Rectangle re = new Rectangle(entryX, startY - i * (entryH + rDialog.height * 0.02f), entryW, entryH);
+                        rSaveEntries.add(re);
+                        drawButton(re, saveFiles[i]);
+                    }
+                }
                 drawButton(rDlgClose, "Close");
                 break;
 
@@ -601,7 +619,7 @@ public class MainMenuScreen extends InputAdapter implements Screen {
 
         if (dialog == Dialog.NONE) {
             if (rNew     .contains(mx, my)) { dialog = Dialog.NEW_GAME;  focusPlayer = true; return true; }
-            if (rLoad    .contains(mx, my)) { dialog = Dialog.LOAD_GAME;                     return true; }
+            if (rLoad    .contains(mx, my)) { dialog = Dialog.LOAD_GAME; saveFiles = SaveManager.listSaves(); return true; }
             if (rSettings.contains(mx, my)) { dialog = Dialog.SETTINGS;                      return true; }
             if (rHelp    .contains(mx, my)) { dialog = Dialog.HELP;                          return true; }
             if (rExit    .contains(mx, my)) { dialog = Dialog.EXIT;                          return true; }
@@ -636,6 +654,20 @@ public class MainMenuScreen extends InputAdapter implements Screen {
         } else if (dialog == Dialog.EXIT) {
             if (rDlgBtn1.contains(mx, my)) { Gdx.app.exit();       return true; }
             if (rDlgBtn2.contains(mx, my)) { dialog = Dialog.NONE; return true; }
+        } else if (dialog == Dialog.LOAD_GAME) {
+            for (int i = 0; i < rSaveEntries.size(); i++) {
+                if (rSaveEntries.get(i).contains(mx, my)) {
+                    try {
+                        com.via.model.GameState loaded = SaveManager.loadGame(saveFiles[i]);
+                        dialog = Dialog.NONE;
+                        game.setScreen(new GameScreen(game, loaded));
+                    } catch (Exception e) {
+                        Gdx.app.log("VIA", "Load failed: " + e.getMessage());
+                    }
+                    return true;
+                }
+            }
+            if (rDlgClose.contains(mx, my)) { dialog = Dialog.NONE; return true; }
         } else {
             if (rDlgClose.contains(mx, my)) { dialog = Dialog.NONE; return true; }
         }

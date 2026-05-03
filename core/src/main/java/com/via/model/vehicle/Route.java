@@ -1,5 +1,6 @@
 package com.via.model.vehicle;
 
+import java.io.Serializable;
 import com.via.model.building.StopOverlay;
 
 import java.util.ArrayList;
@@ -12,7 +13,8 @@ import java.util.UUID;
  * Routes are immutable in terms of stop list order but allow adding new stops.
  * Supports circular traversal of stops for continuous routes.
  */
-public class Route {
+public class Route implements Serializable {
+    private static final long serialVersionUID = 1L;
     private final UUID id;
     private final List<StopOverlay> stops;
 

@@ -18,8 +18,11 @@ import com.via.VIA;
 import com.via.controller.GameController;
 import com.via.controller.GameEngine;
 import com.via.controller.RoadBuilder;
+import com.via.controller.SaveManager;
 import com.via.controller.StopBuilder;
 import com.via.controller.GarageBuilder;
+
+import java.io.IOException;
 import com.via.model.Constants;
 import com.via.model.GameState;
 import com.via.model.building.*;
@@ -70,6 +73,7 @@ public class GameScreen implements Screen {
     private Rectangle btnExit;
     private boolean showExitDialog = false;
     private Rectangle rDialog;
+    private Rectangle rBtnSave;
     private Rectangle rBtnMainMenu;
     private Rectangle rBtnExitGame;
     private Rectangle rBtnClose;
@@ -169,14 +173,15 @@ public class GameScreen implements Screen {
 
         btnExit = new Rectangle(8f, h - TOP_BAR_H + 3f, 80f, TOP_BAR_H - 6f);
 
-        float dW = 420f, dH = 230f;
+        float dW = 460f, dH = 230f;
         float dX = w / 2f - dW / 2f, dY = h / 2f - dH / 2f;
         rDialog = new Rectangle(dX, dY, dW, dH);
-        float bW = 110f, bH = 46f, bY = dY + 20f;
-        float spacing = (dW - bW * 3f) / 4f;
-        rBtnMainMenu = new Rectangle(dX + spacing, bY, bW, bH);
-        rBtnExitGame = new Rectangle(dX + spacing * 2f + bW, bY, bW, bH);
-        rBtnClose = new Rectangle(dX + spacing * 3f + bW * 2f, bY, bW, bH);
+        float bW = 90f, bH = 46f, bY = dY + 20f;
+        float spacing = (dW - bW * 4f) / 5f;
+        rBtnSave     = new Rectangle(dX + spacing,                   bY, bW, bH);
+        rBtnMainMenu = new Rectangle(dX + spacing * 2f + bW,         bY, bW, bH);
+        rBtnExitGame = new Rectangle(dX + spacing * 3f + bW * 2f,    bY, bW, bH);
+        rBtnClose    = new Rectangle(dX + spacing * 4f + bW * 3f,    bY, bW, bH);
 
         float btnW = 40f, btnH = 30f, gap = 4f;
         float startX = w - (btnW + gap) * 4 - 8f;
@@ -311,6 +316,18 @@ public class GameScreen implements Screen {
     }
 
     private void handleMapInput(float delta) {
+        // Ctrl+S — quick save
+        if (Gdx.input.isKeyJustPressed(Input.Keys.S) &&
+            (Gdx.input.isKeyPressed(Input.Keys.CONTROL_LEFT) || Gdx.input.isKeyPressed(Input.Keys.CONTROL_RIGHT))) {
+            try {
+                SaveManager.saveGame(gameState, "quicksave");
+                showFeedback("Game saved!", Color.GREEN);
+            } catch (IOException e) {
+                showFeedback("Save failed!", Color.RED);
+            }
+            return;
+        }
+
         // keyboard camera movement
         if (Gdx.input.isKeyPressed(Input.Keys.LEFT))  mapCamera.translate(-CAMERA_SPEED * delta, 0);
         if (Gdx.input.isKeyPressed(Input.Keys.RIGHT)) mapCamera.translate(CAMERA_SPEED * delta, 0);
@@ -511,6 +528,16 @@ public class GameScreen implements Screen {
         if (!Gdx.input.justTouched()) return;
         float mx = Gdx.input.getX();
         float my = Gdx.graphics.getHeight() - Gdx.input.getY();
+        if (rBtnSave.contains(mx, my)) {
+            try {
+                SaveManager.saveGame(gameState, "quicksave");
+                showFeedback("Game saved!", Color.GREEN);
+            } catch (IOException e) {
+                showFeedback("Save failed!", Color.RED);
+            }
+            showExitDialog = false;
+            return;
+        }
         if (rBtnMainMenu.contains(mx, my)) { showExitDialog = false; game.setScreen(new MainMenuScreen(game)); return; }
         if (rBtnExitGame.contains(mx, my)) { Gdx.app.exit(); return; }
         if (rBtnClose.contains(mx, my)) showExitDialog = false;
@@ -1176,9 +1203,10 @@ public class GameScreen implements Screen {
         drawCentred("What do you want to do?", cx, rDialog.y + rDialog.height * 0.65f,
             new Color(0.80f, 0.85f, 0.95f, 1f));
 
+        drawBtn(rBtnSave,     "Save",      new Color(0.18f, 0.65f, 0.35f, 1f));
         drawBtn(rBtnMainMenu, "Main Menu", new Color(0.20f, 0.47f, 0.80f, 1f));
         drawBtn(rBtnExitGame, "Exit Game", new Color(0.72f, 0.18f, 0.18f, 1f));
-        drawBtn(rBtnClose, "Close", new Color(0.35f, 0.38f, 0.48f, 1f));
+        drawBtn(rBtnClose,    "Close",     new Color(0.35f, 0.38f, 0.48f, 1f));
     }
 
     private void showFeedback(String message, Color color) {

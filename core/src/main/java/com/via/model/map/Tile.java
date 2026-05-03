@@ -1,10 +1,13 @@
 package com.via.model.map;
 
+import java.io.Serializable;
+
 /**
  * Represents a single tile on the game map.
  * A tile contains terrain properties and may optionally have a structure and/or overlay.
  */
-public class Tile {
+public class Tile implements Serializable {
+    private static final long serialVersionUID = 1L;
     /** The coordinates of this tile on the map grid. */
     public final TileCoord coord;
 

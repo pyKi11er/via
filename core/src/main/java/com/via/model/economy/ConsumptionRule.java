@@ -1,5 +1,6 @@
 package com.via.model.economy;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -9,7 +10,8 @@ import java.util.List;
  * A ConsumptionRule specifies all the goods (and their quantities) that must
  * be consumed to produce output according to a {@link ProductionRule}.
  */
-public class ConsumptionRule {
+public class ConsumptionRule implements Serializable {
+    private static final long serialVersionUID = 1L;
 
     /** List of goods and quantities required as inputs */
     private final List<ConsumptionItem> inputs;

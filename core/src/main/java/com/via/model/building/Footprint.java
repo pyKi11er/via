@@ -1,5 +1,6 @@
 package com.via.model.building;
 
+import java.io.Serializable;
 import com.via.model.map.TileCoord;
 
 import java.util.ArrayList;
@@ -11,7 +12,8 @@ import java.util.List;
  * A Footprint defines a axis-aligned rectangle of tiles that a building occupies.
  * It is used to determine tile occupancy, collision detection, and rendering.
  */
-public class Footprint {
+public class Footprint implements Serializable {
+    private static final long serialVersionUID = 1L;
 
     /** The bottom-left (origin) tile coordinate of the footprint */
     private final TileCoord origin;

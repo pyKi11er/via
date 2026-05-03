@@ -1,12 +1,14 @@
 package com.via.model.map;
 
+import java.io.Serializable;
 import java.util.Objects;
 
 /**
  * Represents the coordinates of a tile on the game map grid.
  * This immutable class provides x and y coordinates with proper equality and hash code support.
  */
-public class TileCoord {
+public class TileCoord implements Serializable {
+    private static final long serialVersionUID = 1L;
     /** The x-coordinate (column index) of the tile. */
     public final int x;
 

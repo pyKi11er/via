@@ -1,5 +1,6 @@
 package com.via.model.economy;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -10,7 +11,8 @@ import java.util.List;
  * produced when the inputs defined in the corresponding {@link ConsumptionRule}
  * are consumed.
  */
-public class ProductionRule {
+public class ProductionRule implements Serializable {
+    private static final long serialVersionUID = 1L;
 
     /** List of goods and quantities produced per production cycle */
     private final List<ProductionItem> outputs;

@@ -16,6 +16,23 @@ import com.via.model.vehicle.*;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Utility class responsible for creating and initializing a complete game map.
+ *
+ * <p>This includes:</p>
+ * <ul>
+ *     <li>Generating terrain and base tiles</li>
+ *     <li>Placing initial buildings (facilities, city, garage, parking)</li>
+ *     <li>Constructing a road network</li>
+ *     <li>Adding transport stops and routes</li>
+ *     <li>Spawning initial vehicles</li>
+ *     <li>Seeding environmental features such as forests</li>
+ * </ul>
+ *
+ * <p>The generated map represents a predefined starting scenario designed
+ * for testing or demo gameplay.</p>
+ */
+
 public class MapInitializer {
 
     private static final TileCoord MINE_ORIGIN       = new TileCoord(2,  20);
@@ -26,7 +43,23 @@ public class MapInitializer {
     private static final TileCoord PARKING_ORIGIN    = new TileCoord(4,  14);
 
     private static final int ROAD_Y = 17;
-
+    /**
+     * Creates and returns a fully initialized {@link GameState}.
+     *
+     * <p>The initialization process performs the following steps:</p>
+     * <ol>
+     *     <li>Create a blank map with default terrain</li>
+     *     <li>Generate terrain variation</li>
+     *     <li>Seed initial forest areas</li>
+     *     <li>Place buildings (facilities, city, garage, parking)</li>
+     *     <li>Construct road network</li>
+     *     <li>Place stops and create a transport route</li>
+     *     <li>Spawn initial vehicles and assign routes</li>
+     *     <li>Finalize terrain slope types</li>
+     * </ol>
+     *
+     * @return a new, fully initialized game state
+     */
     public static GameState createNewGame() {
 
         // 1. Blank map
@@ -99,7 +132,9 @@ public class MapInitializer {
 
         return state;
     }
-
+    /**
+     * Builds a mining facility producing iron.
+     */
     private static void buildMine(Map map, GameState state) {
         ProductionRule  prod = new ProductionRule(List.of(new ProductionItem(GoodType.IRON, 10)));
         ConsumptionRule cons = new ConsumptionRule(List.of());
@@ -107,7 +142,9 @@ public class MapInitializer {
         stampBuilding(map, mine);
         state.addBuilding(mine);
     }
-
+    /**
+     * Builds a forest camp producing wood.
+     */
     private static void buildForestCamp(Map map, GameState state) {
         ProductionRule  prod = new ProductionRule(List.of(new ProductionItem(GoodType.WOOD, 8)));
         ConsumptionRule cons = new ConsumptionRule(List.of());
@@ -115,7 +152,9 @@ public class MapInitializer {
         stampBuilding(map, forestCamp);
         state.addBuilding(forestCamp);
     }
-
+    /**
+     * Builds a steel mill that consumes iron and produces steel.
+     */
     private static void buildSteelMill(Map map, GameState state) {
         ProductionRule  prod = new ProductionRule(List.of(new ProductionItem(GoodType.STEEL, 5)));
         ConsumptionRule cons = new ConsumptionRule(List.of(new ConsumptionItem(GoodType.IRON, 8)));
@@ -123,7 +162,9 @@ public class MapInitializer {
         stampBuilding(map, steelMill);
         state.addBuilding(steelMill);
     }
-
+    /**
+     * Builds a city with passenger demand and a defined access gate.
+     */
     private static void buildCityA(Map map, GameState state) {
         Footprint fp = new Footprint(CITY_A_ORIGIN, 3, 3);
         List<CityGate> gates = List.of(
@@ -133,12 +174,21 @@ public class MapInitializer {
         stampBuilding(map, city);
         state.addBuilding(city);
     }
+    /**
+     * Builds a garage for vehicle storage and spawning.
+     */
 
     private static void buildGarage(Map map, GameState state) {
         Garage garage = new Garage(new Footprint(GARAGE_ORIGIN, 1, 1));
         stampBuilding(map, garage);
         state.addBuilding(garage);
     }
+    /**
+     * Applies a building's footprint onto the map tiles.
+     *
+     * @param map the map
+     * @param building the building to place
+     */
 
     private static void stampBuilding(Map map, Building building) {
         for (TileCoord coord : building.getOccupiedTiles()) {
@@ -148,7 +198,9 @@ public class MapInitializer {
             tile.setStructure((Structure) building);
         }
     }
-
+    /**
+     * Constructs the predefined road network.
+     */
     private static void buildRoads(Map map) {
         for (int x = 2; x <= 32; x++) placeRoad(map, x, ROAD_Y);
         for (int y = ROAD_Y + 1; y <= 19; y++) placeRoad(map, 3,  y);
@@ -178,6 +230,9 @@ public class MapInitializer {
             }
         }
     }
+    /**
+     * Places a road tile if the location is valid and empty.
+     */
 
     private static void placeRoad(Map map, int x, int y) {
         TileCoord coord = new TileCoord(x, y);
@@ -186,6 +241,15 @@ public class MapInitializer {
         if (tile == null || tile.getStructure() != null) return;
         tile.setStructure(new Road(coord, 100));
     }
+
+    /**
+     * Places a stop overlay on a road tile.
+     *
+     * @param map the map
+     * @param name display name of the stop
+     * @param coord location of the stop
+     * @return the created {@link StopOverlay}, or {@code null} if placement fails
+     */
 
     private static StopOverlay placeStop(Map map, String name, TileCoord coord) {
         if (!map.isWithinBounds(coord)) return null;
@@ -198,7 +262,11 @@ public class MapInitializer {
         tile.setOverlay(stop);
         return stop;
     }
-
+    /**
+     * Seeds predefined forest patches on the map.
+     *
+     * @param map the map to modify
+     */
     private static void seedForests(Map map) {
         int[][] seeds = {
             {1, 25, 2}, {2, 25, 1}, {1, 26, 1}, {2, 26, 3}, {3, 26, 1},

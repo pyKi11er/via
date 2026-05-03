@@ -2,16 +2,37 @@ package com.via.model;
 
 import com.via.model.enums.GoodType;
 
+/**
+ * Central repository of game-wide constants and configuration values.
+ * Includes map dimensions, tick rates, economic values, vehicle maintenance,
+ * and utility methods for calculating maintenance intervals and resale values.
+ * This class cannot be instantiated.
+ */
 public class Constants {
     private Constants() {}
 
+    /** Size of a tile in pixels for rendering. */
     public static final int TILE_SIZE = 32;        // pixels per tile
+
+    /** Width of the map in tiles. */
     public static final int MAP_WIDTH = 40;        // tiles
+
+    /** Height of the map in tiles. */
     public static final int MAP_HEIGHT = 30;       // tiles
+
+    /** Normal tick rate in seconds per tick. */
     public static final float NORMAL_TICK_RATE = 1f / 60f; // seconds per tick
+
+    /** Fast game speed multiplier. */
     public static final float FAST_MULTIPLIER = 2f;
+
+    /** Very fast game speed multiplier. */
     public static final float VERY_FAST_MULTIPLIER = 4f;
+
+    /** Starting capital for a new game. */
     public static final long STARTING_CAPITAL = 100_000L;
+
+    /** Maximum number of vehicles a garage can hold. */
     public static final int GARAGE_CAPACITY = 5;
 
     /** Cost to place one stop (used by {@link com.via.controller.StopBuilder}). */
@@ -20,7 +41,7 @@ public class Constants {
     /** Cost to raise or lower one tile by one level. */
     public static final int TERRAFORM_COST_PER_LEVEL = 500;
 
-    /** Deduct maintenance once per interval per vehicle. */
+    /** Maintenance deduction interval per vehicle in ticks (1 minute in game). */
     public static final int VEHICLE_MAINTENANCE_INTERVAL_TICKS = 18000; // 1 minute in game
 
     /**
@@ -50,7 +71,14 @@ public class Constants {
      */
     public static final double VEHICLE_MIN_RESALE_FRACTION = 0.10;
 
-    /** Returns the maintenance interval in ticks based on current vehicle age. */
+    /**
+     * Returns the maintenance interval in ticks based on current vehicle age.
+     * As vehicles age, maintenance becomes more frequent (interval decreases),
+     * but never below the configured minimum.
+     *
+     * @param ageTicks the current age of the vehicle in ticks
+     * @return the maintenance interval in ticks
+     */
     public static long getMaintenanceIntervalTicks(long ageTicks) {
         if (ageTicks < 0) ageTicks = 0;
         double base = VEHICLE_MAINTENANCE_INTERVAL_TICKS;
@@ -59,7 +87,14 @@ public class Constants {
         return Math.max(VEHICLE_MIN_MAINTENANCE_INTERVAL_TICKS, interval);
     }
 
-    /** Computes resale value as a deterministic function of age. */
+    /**
+     * Computes resale value as a deterministic function of vehicle age.
+     * Resale value declines linearly with age down to the minimum fraction.
+     *
+     * @param purchaseCost the original purchase cost of the vehicle
+     * @param ageTicks     the current age of the vehicle in ticks
+     * @return the calculated resale value
+     */
     public static long getResaleValue(long purchaseCost, long ageTicks) {
         if (purchaseCost <= 0) return 0;
         if (ageTicks < 0) ageTicks = 0;
@@ -70,6 +105,12 @@ public class Constants {
         return Math.round(purchaseCost * frac);
     }
 
+    /**
+     * Returns the base income per unit transported for a given good type.
+     *
+     * @param type the type of good (may be null)
+     * @return the income per unit, or 0 if type is null
+     */
     public static long getBaseIncomePerUnit(GoodType type) {
         if (type == null) return 0L;
         return switch (type) {

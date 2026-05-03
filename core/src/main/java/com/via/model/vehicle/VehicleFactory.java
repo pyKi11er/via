@@ -9,11 +9,24 @@ import com.via.model.map.TileCoord;
 import java.util.List;
 
 /**
- * Vehicle creation / purchase logic.
- * Vehicles can only be purchased in a {@link Garage}.
+ * Vehicle creation and purchase logic factory.
+ * Provides functionality to purchase new vehicles, which can only be done at a {@link Garage}.
+ * Handles vehicle instantiation, positioning, parking slot assignment, and economic transactions.
  */
 public class VehicleFactory {
 
+    /**
+     * Purchases a new vehicle of the specified type from a garage.
+     * The vehicle spawns on an adjacent road tile, deducts the purchase cost from the economy,
+     * and assigns it a parking slot if available.
+     *
+     * @param state   the current game state (must not be null)
+     * @param garage  the garage from which to purchase the vehicle (must not be null)
+     * @param type    the type of vehicle to purchase (must not be null)
+     * @return the newly created and initialized vehicle
+     * @throws IllegalArgumentException if any parameter is null
+     * @throws IllegalStateException    if the map is null or the garage has no adjacent road tile
+     */
     public static Vehicle buy(GameState state, Garage garage, VehicleType type) {
         if (state == null) throw new IllegalArgumentException("state must not be null");
         if (garage == null) throw new IllegalArgumentException("garage must not be null");
@@ -41,10 +54,10 @@ public class VehicleFactory {
             case CITY_BUS     -> new CityBus(pos);
         };
 
-        // Charge purchase cost.
+        // Charge purchase cost
         state.getEconomy().deduct(v.getPurchaseCost());
 
-        // Initialize age/maintenance schedule.
+        // Initialize age/maintenance schedule
         long purchaseTick = state.getTimeState() != null ? state.getTimeState().getTick() : 0;
         v.onPurchased(purchaseTick);
 

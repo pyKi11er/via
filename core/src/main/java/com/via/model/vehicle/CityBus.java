@@ -2,8 +2,17 @@ package com.via.model.vehicle;
 
 import com.via.model.enums.VehicleType;
 
-/** Large, slower city transit bus with high seat capacity. */
+/**
+ * Large, slower city transit bus with high seat capacity.
+ * Suitable for urban routes with frequent stops and high passenger demand.
+ */
 public class CityBus extends Vehicle {
+
+    /**
+     * Constructs a new CityBus at the specified initial position.
+     *
+     * @param position the starting position of the city bus
+     */
     public CityBus(VehiclePosition position) {
         super(
             VehicleType.CITY_BUS,

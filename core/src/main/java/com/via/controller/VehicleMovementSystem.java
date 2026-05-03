@@ -422,4 +422,21 @@ public class VehicleMovementSystem {
         }
         return true;
     }
+
+
+    private Vehicle getVehicleAheadInSameTile(Vehicle mover, VehiclePosition pos) {
+        Set<Vehicle> occupants = occupancy.get(pos.getOrigin());
+        if (occupants == null) return null;
+        for (Vehicle other : occupants) {
+            if (other == mover) continue;
+            VehiclePosition op = other.getPosition();
+            if (op == null) continue;
+            if (op.getDestination().equals(pos.getDestination())) {
+                if (op.getProgress() >= pos.getProgress()) {
+                    return other;
+                }
+            }
+        }
+        return null;
+    }
 }

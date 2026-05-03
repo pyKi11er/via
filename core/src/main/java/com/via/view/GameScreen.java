@@ -18,8 +18,11 @@ import com.via.VIA;
 import com.via.controller.GameController;
 import com.via.controller.GameEngine;
 import com.via.controller.RoadBuilder;
+import com.via.controller.SaveManager;
 import com.via.controller.StopBuilder;
 import com.via.controller.GarageBuilder;
+
+import java.io.IOException;
 import com.via.model.Constants;
 import com.via.model.GameState;
 import com.via.model.building.*;
@@ -311,6 +314,18 @@ public class GameScreen implements Screen {
     }
 
     private void handleMapInput(float delta) {
+        // Ctrl+S — quick save
+        if (Gdx.input.isKeyJustPressed(Input.Keys.S) &&
+            (Gdx.input.isKeyPressed(Input.Keys.CONTROL_LEFT) || Gdx.input.isKeyPressed(Input.Keys.CONTROL_RIGHT))) {
+            try {
+                SaveManager.saveGame(gameState, "quicksave");
+                showFeedback("Game saved!", Color.GREEN);
+            } catch (IOException e) {
+                showFeedback("Save failed!", Color.RED);
+            }
+            return;
+        }
+
         // keyboard camera movement
         if (Gdx.input.isKeyPressed(Input.Keys.LEFT))  mapCamera.translate(-CAMERA_SPEED * delta, 0);
         if (Gdx.input.isKeyPressed(Input.Keys.RIGHT)) mapCamera.translate(CAMERA_SPEED * delta, 0);

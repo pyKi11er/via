@@ -121,6 +121,13 @@ public class VehicleMovementSystem {
         double slope      = map.getVehicleSpeedMultiplier(pos.getOrigin(), pos.getDestination());
         float appliedSpeed = (float) (baseSpeed * slope);
 
+        // ---> NEW: Traffic / Tailgating Logic <---
+        Vehicle ahead = getVehicleAheadInSameTile(v, pos);
+        if (ahead != null && !pos.isOvertaking()) {
+            // We are stuck behind someone in the same tile. Hit the brakes!
+            appliedSpeed *= BLOCKED_SPEED_FACTOR;
+        }
+        // -----------------------------------------
         // progressively ramp up speed if currently overtaking
         if (pos.isOvertaking()) {
             float ramp = overtakeRamp.getOrDefault(v.getId(), 1.0f);

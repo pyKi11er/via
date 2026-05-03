@@ -404,9 +404,15 @@ public class VehicleMovementSystem {
             int myDy  = to.y - from.y;
             int opDx  = op.getDestination().x - op.getOrigin().x;
             int opDy  = op.getDestination().y - op.getOrigin().y;
-            boolean headOn = (myDx == -opDx && myDy == -opDy);
+
+            //overtaking fix - allow head on passing
+            boolean headOn = (myDx == -opDx && myDy == opDy) && (myDx != 0 || myDy != 0);
             if (headOn) continue;
 
+            // fix: if the occupant is currently vacating 'to' (leaving), we can enter and tail them
+            if (op.getOrigin().equals(to) && !op.getDestination().equals(to)) {
+                continue;
+            }
             // Same direction or stationary — block entry
             return false;
         }

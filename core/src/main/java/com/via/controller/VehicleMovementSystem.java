@@ -74,7 +74,11 @@ public class VehicleMovementSystem {
 
             VehiclePosition pos = v.getPosition();
             if (pos == null) continue;
+            // fix: Mark both origin and destination to prevent vehicles piling into the same tile
             markOccupied(pos.getOrigin(), v);
+            if (!pos.getOrigin().equals(pos.getDestination())) {
+                markOccupied(pos.getDestination(), v);
+            }
         }
 
         for (Vehicle v : state.getVehicles()) {

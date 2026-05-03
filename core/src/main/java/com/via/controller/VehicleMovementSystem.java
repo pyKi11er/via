@@ -32,9 +32,7 @@ public class VehicleMovementSystem {
     private static final int   MAX_VEHICLES_PER_TILE  = 2;
     private static final float BASE_DELTA              = 0.016f;
     private static final int   STOP_WAIT_TICKS         = 60;
-    // How many tiles ahead to scan for oncoming traffic before allowing overtake
     private static final int   OVERTAKE_LOOK_AHEAD     = 3;
-    // Perpendicular pixel offset applied to sprite while overtaking (in tile units)
     private static final float OVERTAKE_LANE_OFFSET    = 0.35f;
     private static final float BLOCKED_SPEED_FACTOR = 0.3f; // 30% speed when stuck behind slower vehicle
     // track progressive overtake acceleration per vehicle
@@ -86,14 +84,6 @@ public class VehicleMovementSystem {
             if (pos == null) continue;
             updateVehicleMovement(state, v, pos, map, delta);
         }
-    }
-    /**
-     * Returns the next tile the vehicle plans to move into, without removing it from the path.
-     */
-    private TileCoord peekNextStep(Vehicle v) {
-        Queue<TileCoord> path = pathCache.get(v.getId());
-        if (path == null || path.isEmpty()) return null;
-        return path.peek();
     }
     /**
      * Updates movement logic for a single vehicle.

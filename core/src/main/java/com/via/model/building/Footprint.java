@@ -2,10 +2,12 @@ package com.via.model.building;
 
 import com.via.model.map.TileCoord;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 
-public class Footprint {
+public class Footprint implements Serializable {
+    private static final long serialVersionUID = 1L;
     private final TileCoord origin;
     private final int width;
     private final int height;

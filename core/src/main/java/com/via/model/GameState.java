@@ -6,10 +6,12 @@ import com.via.model.map.Map;
 import com.via.model.vehicle.Route;
 import com.via.model.vehicle.Vehicle;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 
-public class GameState {
+public class GameState implements Serializable {
+    private static final long serialVersionUID = 1L;
     private Map map;
     private List<Vehicle> vehicles;
     private List<Route> routes;

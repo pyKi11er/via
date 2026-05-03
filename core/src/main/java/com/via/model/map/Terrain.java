@@ -1,8 +1,10 @@
 package com.via.model.map;
 
+import java.io.Serializable;
 import java.util.Objects;
 
-public class Terrain {
+public class Terrain implements Serializable {
+    private static final long serialVersionUID = 1L;
     public static final int MIN_FOREST_LEVEL = 0;
     public static final int MAX_FOREST_LEVEL = 4;
 

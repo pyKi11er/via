@@ -2,7 +2,10 @@ package com.via.model.economy;
 
 import com.via.model.Constants;
 
-public class PlayerEconomy {
+import java.io.Serializable;
+
+public class PlayerEconomy implements Serializable {
+    private static final long serialVersionUID = 1L;
     private long capital;
     public PlayerEconomy() {
         capital = Constants.STARTING_CAPITAL;

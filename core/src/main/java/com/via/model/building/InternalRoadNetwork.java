@@ -2,10 +2,12 @@ package com.via.model.building;
 
 import com.via.model.map.TileCoord;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 
-public class InternalRoadNetwork {
+public class InternalRoadNetwork implements Serializable {
+    private static final long serialVersionUID = 1L;
     private final List<TileCoord> roadTiles;
     private final List<CityGate> entryPoints;
 

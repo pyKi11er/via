@@ -2,12 +2,14 @@ package com.via.model.vehicle;
 
 import com.via.model.building.StopOverlay;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
-public class Route {
+public class Route implements Serializable {
+    private static final long serialVersionUID = 1L;
     private final UUID id;
     private final List<StopOverlay> stops;
 

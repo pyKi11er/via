@@ -4,8 +4,10 @@ import com.via.model.enums.AccessType;
 import com.via.model.enums.Direction;
 import com.via.model.map.TileCoord;
 
-/** Connection point from a StopOverlay to a tile on the road network. */
-public class StopAccess {
+import java.io.Serializable;
+
+public class StopAccess implements Serializable {
+    private static final long serialVersionUID = 1L;
     private final AccessType accessType;
     private final TileCoord anchor;
     private final Direction direction;

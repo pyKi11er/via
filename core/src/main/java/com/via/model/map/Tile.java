@@ -1,6 +1,9 @@
 package com.via.model.map;
 
-public class Tile {
+import java.io.Serializable;
+
+public class Tile implements Serializable {
+    private static final long serialVersionUID = 1L;
     public final TileCoord coord;
     private Terrain terrain;
     private Structure structure;

@@ -1,7 +1,6 @@
 package com.via.model.map;
 
+import java.io.Serializable;
 
-//base interface for map structures
-
-public interface Structure {
+public interface Structure extends Serializable {
 }

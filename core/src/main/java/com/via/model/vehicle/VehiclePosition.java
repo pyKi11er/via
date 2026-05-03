@@ -2,7 +2,10 @@ package com.via.model.vehicle;
 
 import com.via.model.map.TileCoord;
 
-public class VehiclePosition {
+import java.io.Serializable;
+
+public class VehiclePosition implements Serializable {
+    private static final long serialVersionUID = 1L;
     private TileCoord origin;
     private TileCoord destination;
     private float progress;

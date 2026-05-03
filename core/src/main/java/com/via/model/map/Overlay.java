@@ -1,10 +1,6 @@
 package com.via.model.map;
 
+import java.io.Serializable;
 
-
-//base interface for map overlays
-
-public interface Overlay {
-
-
+public interface Overlay extends Serializable {
 }

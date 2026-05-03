@@ -1,8 +1,10 @@
 package com.via.model.map;
 
+import java.io.Serializable;
 import java.util.Objects;
 
-public class TileCoord {
+public class TileCoord implements Serializable {
+    private static final long serialVersionUID = 1L;
     public final int x;
     public final int y;
     public TileCoord(int x, int y) {

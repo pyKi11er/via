@@ -2,7 +2,10 @@ package com.via.model.vehicle;
 
 import com.via.model.enums.GoodType;
 
-public class Cargo {
+import java.io.Serializable;
+
+public class Cargo implements Serializable {
+    private static final long serialVersionUID = 1L;
     private GoodType type;
     private int amount;
 

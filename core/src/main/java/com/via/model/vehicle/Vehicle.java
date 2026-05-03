@@ -5,9 +5,11 @@ import com.via.model.Constants; // Restored the Constants import
 import com.via.model.enums.VehicleType;
 import com.via.model.map.TileCoord;
 
+import java.io.Serializable;
 import java.util.UUID;
 
-public abstract class Vehicle {
+public abstract class Vehicle implements Serializable {
+    private static final long serialVersionUID = 1L;
     private final UUID id;
     private final VehicleType type;
     private VehiclePosition position;

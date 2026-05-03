@@ -286,8 +286,8 @@ public class VehicleMovementSystem {
             if (op == null) continue;
             int vdx = op.getDestination().x - op.getOrigin().x;
             int vdy = op.getDestination().y - op.getOrigin().y;
-            // Oncoming = moving in opposite direction to the overtaker
-            if (vdx == -dx && vdy == -dy) return true;
+            // fix: added safeguard to ensure stopped vehicles aren't flagged as oncoming
+            if (vdx == -dx && vdy == -dy && (vdx != 0 || vdy != 0)) return true;
         }
         return false;
     }

@@ -8,7 +8,7 @@ import java.nio.file.Paths;
 
 public class SaveManager {
 
-    private static final String SAVE_DIR = "saves";
+    private static final String SAVE_DIR = System.getProperty("user.home") + File.separator + ".via" + File.separator + "saves";
     private static final String SAVE_EXTENSION = ".via";
 
     public static void saveGame(GameState gameState, String saveName) throws IOException {

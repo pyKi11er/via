@@ -21,7 +21,6 @@ public class VehicleMovementSystem {
     private static final int   STOP_WAIT_TICKS         = 60;
     private static final int   OVERTAKE_LOOK_AHEAD     = 3;
     private static final float OVERTAKE_LANE_OFFSET    = 0.35f;
-    private static final float BLOCKED_SPEED_FACTOR    = 0.3f; // Enforces traffic pacing
 
     private final java.util.Map<UUID, Float> overtakeRamp = new HashMap<>();
     private final EconomySystem economySystem;
@@ -45,7 +44,7 @@ public class VehicleMovementSystem {
             VehiclePosition pos = v.getPosition();
             if (pos == null) continue;
 
-            // Mark both origin and destination to claim the path
+            // Mark both origin and destination to claim the full path segment
             markOccupied(pos.getOrigin(), v);
             if (!pos.getOrigin().equals(pos.getDestination())) {
                 markOccupied(pos.getDestination(), v);
@@ -68,7 +67,7 @@ public class VehicleMovementSystem {
                     v.rescheduleNextMaintenanceDueTick(state.getTimeState().getTick());
                     v.setStopWaitTicks(0);
                 } else {
-                    return; // Bankrupt! Freeze at 1 tick left.
+                    return; // Bankrupt freeze
                 }
             } else {
                 v.setStopWaitTicks(v.getStopWaitTicks() - 1);
@@ -82,10 +81,20 @@ public class VehicleMovementSystem {
             double slope      = map.getVehicleSpeedMultiplier(pos.getOrigin(), pos.getDestination());
             float appliedSpeed = (float) (baseSpeed * slope);
 
-            // Tailgating Logic
-            Vehicle ahead = getVehicleAheadInSameTile(v, pos);
+            // ---> Continuous Radar & Queue Pacing <---
+            AheadData ahead = getVehicleAhead(v, pos);
             if (ahead != null && !pos.isOvertaking()) {
-                appliedSpeed *= BLOCKED_SPEED_FACTOR;
+                float leaderSpeed = (ahead.v.getStopWaitTicks() > 0 || ahead.v.isMaintaining()) ? 0f : ahead.v.getSpeed();
+
+                if (ahead.gap < 0.20f) {
+                    // Hard Brake! Do not clip!
+                    appliedSpeed = 0f;
+                } else if (ahead.gap < 0.60f) {
+                    // Match speed to gently pull up behind them
+                    if (appliedSpeed > leaderSpeed) {
+                        appliedSpeed = leaderSpeed;
+                    }
+                }
             }
 
             // Overtaking Acceleration
@@ -98,8 +107,8 @@ public class VehicleMovementSystem {
                 overtakeRamp.remove(v.getId());
             }
 
-            // Safeguard against absolutely zero speed mathematically halting the vehicle
-            if (appliedSpeed <= 0.001f) appliedSpeed = 0.01f;
+            // Safeguard against absolute zero math locks
+            if (appliedSpeed <= 0.001f && appliedSpeed > 0f) appliedSpeed = 0.01f;
 
             float newProgress = pos.getProgress() + appliedSpeed * delta;
             if (newProgress < 1f) {
@@ -108,12 +117,15 @@ public class VehicleMovementSystem {
             }
 
             // Arrived at destination tile boundary!
-            pos.setOvertaking(false);
-            overtakeRamp.remove(v.getId());
             pos.setOrigin(pos.getDestination());
             pos.setProgress(0f);
 
-            // Did we arrive at a valid route stop?
+            // Stubborn Overtaker (Don't merge into slow vehicles)
+            if (!sharesTileWithSlowerVehicle(v, pos.getOrigin())) {
+                pos.setOvertaking(false);
+                overtakeRamp.remove(v.getId());
+            }
+
             StopOverlay nextStop = v.getNextStop();
             if (nextStop != null && nextStop.getLocation().equals(pos.getOrigin())) {
                 unloadAtStop(state, v, nextStop);
@@ -121,11 +133,11 @@ public class VehicleMovementSystem {
                 v.advanceToNextStop();
                 pathCache.remove(v.getId());
                 v.setStopWaitTicks(STOP_WAIT_TICKS);
-                return; // Entering Wait State
+                return;
             }
         }
 
-        // 3. Idle State: We have finished our previous move and need a new target tile
+        // 3. Idle State: Acquire next tile
         StopOverlay nextStop = v.getNextStop();
         if (nextStop == null) return;
 
@@ -135,7 +147,7 @@ public class VehicleMovementSystem {
             if (!plannedPath.isEmpty()) {
                 pathCache.put(v.getId(), plannedPath);
             } else {
-                return; // No path found, stay idle
+                return;
             }
         }
 
@@ -143,13 +155,12 @@ public class VehicleMovementSystem {
         TileCoord nextStep = plannedPath.peek();
         if (nextStep == null) return;
 
-        // Overtaking Check: Is there a vehicle blocking our way?
         Vehicle blocker = getBlockingVehicle(v, pos.getOrigin(), nextStep);
         boolean isBlockerStopped = (blocker != null) &&
-            blocker.getPosition().getOrigin().equals(blocker.getPosition().getDestination());
+            (blocker.getPosition().getOrigin().equals(blocker.getPosition().getDestination()) || blocker.getStopWaitTicks() > 0);
 
         if (blocker != null && !pos.isOvertaking()) {
-            // ALWAYS allow overtaking if the blocker is stopped, regardless of top speed!
+            // ALWAYS allow overtaking if the blocker is stopped
             if (blocker.getSpeed() < v.getSpeed() || isBlockerStopped) {
                 if (canOvertake(state, v, pos, map, nextStep)) {
                     startOvertake(v, pos, nextStep);
@@ -162,39 +173,106 @@ public class VehicleMovementSystem {
             }
         }
 
-        // Normal Entry Check
+        // T-Bone Blocker & Tailgater
         if (!canEnterTile(v, pos.getOrigin(), nextStep)) {
-            return; // Blocked! We stay idle and wait for traffic to clear.
+            return; // Blocked at intersection! Wait here.
         }
 
-        // Success! Acquire the next step and start moving.
-        pos.setOvertaking(false);
-        overtakeRamp.remove(v.getId());
+        // Safely entered next tile
+        if (!pos.isOvertaking()) overtakeRamp.remove(v.getId());
         markOccupied(nextStep, v);
         pos.setDestination(nextStep);
         plannedPath.poll();
     }
 
     // ══════════════════════════════════════════════════════════════════════════
-    // Overtaking & Traffic Logic
+    // Radar & Gap Calculation
     // ══════════════════════════════════════════════════════════════════════════
 
-    private Vehicle getVehicleAheadInSameTile(Vehicle mover, VehiclePosition pos) {
-        Set<Vehicle> occupants = occupancy.get(pos.getOrigin());
-        if (occupants == null) return null;
+    private static class AheadData {
+        Vehicle v;
+        float gap;
+        AheadData(Vehicle v, float gap) { this.v = v; this.gap = gap; }
+    }
 
-        for (Vehicle other : occupants) {
-            if (other == mover) continue;
-            VehiclePosition op = other.getPosition();
-            if (op == null) continue;
+    private AheadData getVehicleAhead(Vehicle mover, VehiclePosition myPos) {
+        Vehicle closest = null;
+        float minGap = Float.MAX_VALUE;
 
-            if (op.getDestination().equals(pos.getDestination())) {
-                if (op.getProgress() >= pos.getProgress()) {
-                    return other;
+        // 1. Scan the Current Segment
+        Set<Vehicle> inOrigin = occupancy.get(myPos.getOrigin());
+        if (inOrigin != null) {
+            for (Vehicle other : inOrigin) {
+                if (other == mover) continue;
+                VehiclePosition op = other.getPosition();
+                if (op == null) continue;
+
+                if (op.getOrigin().equals(myPos.getOrigin()) && op.getDestination().equals(myPos.getDestination())) {
+                    if (op.getProgress() >= myPos.getProgress()) {
+                        float gap = op.getProgress() - myPos.getProgress();
+                        // Tie breaker
+                        if (gap == 0f && other.getId().compareTo(mover.getId()) < 0) continue;
+
+                        if (gap < minGap) { minGap = gap; closest = other; }
+                    }
                 }
             }
         }
+
+        // 2. Scan the Next Segment (Destinations)
+        Set<Vehicle> inDest = occupancy.get(myPos.getDestination());
+        if (inDest != null && !myPos.getOrigin().equals(myPos.getDestination())) {
+            for (Vehicle other : inDest) {
+                if (other == mover) continue;
+                VehiclePosition op = other.getPosition();
+                if (op == null) continue;
+
+                // They are vacating our destination or stopped at it
+                if (op.getOrigin().equals(myPos.getDestination())) {
+                    if (op.getDestination().equals(myPos.getOrigin())) continue; // Ignore head-on
+
+                    float gap = (1.0f - myPos.getProgress()) + op.getProgress();
+                    if (gap < minGap) { minGap = gap; closest = other; }
+                }
+
+                // They are merging into our destination from elsewhere
+                if (op.getDestination().equals(myPos.getDestination()) && !op.getOrigin().equals(myPos.getOrigin())) {
+                    if (op.getProgress() > myPos.getProgress()) {
+                        float gap = 1.0f - myPos.getProgress();
+                        if (gap < minGap) { minGap = gap; closest = other; }
+                    }
+                }
+            }
+        }
+
+        if (closest != null && minGap <= 1.0f) return new AheadData(closest, minGap);
         return null;
+    }
+
+    private boolean sharesTileWithSlowerVehicle(Vehicle mover, TileCoord currentTile) {
+        Set<Vehicle> occupants = occupancy.get(currentTile);
+        if (occupants == null) return false;
+
+        VehiclePosition myPos = mover.getPosition();
+        for (Vehicle other : occupants) {
+            if (other == mover) continue;
+
+            VehiclePosition op = other.getPosition();
+            if (op == null) continue;
+
+            int myDx = myPos.getDestination().x - myPos.getOrigin().x;
+            int myDy = myPos.getDestination().y - myPos.getOrigin().y;
+            int opDx = op.getDestination().x - op.getOrigin().x;
+            int opDy = op.getDestination().y - op.getOrigin().y;
+
+            if (myDx == -opDx && myDy == -opDy && (myDx != 0 || myDy != 0)) continue;
+
+            // Keep overtaking flag until slower vehicle is entirely cleared
+            if (other.getSpeed() < mover.getSpeed() || other.getStopWaitTicks() > 0 || other.isMaintaining()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private boolean canOvertake(GameState state, Vehicle v, VehiclePosition pos, Map map, TileCoord nextStep) {
@@ -247,6 +325,58 @@ public class VehicleMovementSystem {
             if (vdx == -myDx && vdy == -myDy && (vdx != 0 || vdy != 0)) return true;
         }
         return false;
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // Tile Occupancy
+    // ══════════════════════════════════════════════════════════════════════════
+
+    private void markOccupied(TileCoord coord, Vehicle v) {
+        occupancy.computeIfAbsent(coord, k -> new HashSet<>()).add(v);
+    }
+
+    private boolean canEnterTile(Vehicle entrant, TileCoord from, TileCoord to) {
+        Set<Vehicle> occupants = occupancy.get(to);
+        if (occupants == null || occupants.isEmpty()) return true;
+
+        if (occupants.size() >= MAX_VEHICLES_PER_TILE) return false;
+
+        for (Vehicle other : occupants) {
+            if (other == entrant) continue;
+            VehiclePosition op = other.getPosition();
+            if (op == null) continue;
+
+            int myDx  = to.x - from.x;
+            int myDy  = to.y - from.y;
+            int opDx  = op.getDestination().x - op.getOrigin().x;
+            int opDy  = op.getDestination().y - op.getOrigin().y;
+
+            // Allow head-on passing safely in the other lane
+            boolean headOn = (myDx == -opDx && myDy == -opDy) && (myDx != 0 || myDy != 0);
+            if (headOn) continue;
+
+            // Allow tailgating! (Our new AheadData radar will prevent them from crashing)
+            boolean sameDir = (myDx == opDx && myDy == opDy) && (myDx != 0 || myDy != 0);
+            if (sameDir) continue;
+
+            // Allow entry if occupant is currently driving out of the tile
+            if (op.getOrigin().equals(to) && !op.getDestination().equals(to)) {
+                continue;
+            }
+
+            // ---> NEW FIX: Deadlock Swap Breaker <---
+            // If the blocking vehicle is parked/idle, check if it wants to swap places with us
+            if (opDx == 0 && opDy == 0 && other.getId() != null) {
+                Queue<TileCoord> opPath = pathCache.get(other.getId());
+                if (opPath != null && !opPath.isEmpty() && opPath.peek().equals(from)) {
+                    continue; // Let us enter so they can leave!
+                }
+            }
+
+            // BLOCKED! This prevents vehicles from T-Boning each other at intersections
+            return false;
+        }
+        return true;
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -318,47 +448,5 @@ public class VehicleMovementSystem {
         if (t == null) return false;
         Structure s = t.getStructure();
         return s instanceof Road || s instanceof com.via.model.building.City;
-    }
-
-    // ══════════════════════════════════════════════════════════════════════════
-    // Tile Occupancy
-    // ══════════════════════════════════════════════════════════════════════════
-
-    private void markOccupied(TileCoord coord, Vehicle v) {
-        occupancy.computeIfAbsent(coord, k -> new HashSet<>()).add(v);
-    }
-
-    private boolean canEnterTile(Vehicle entrant, TileCoord from, TileCoord to) {
-        Set<Vehicle> occupants = occupancy.get(to);
-        if (occupants == null || occupants.isEmpty()) return true;
-
-        if (occupants.size() >= MAX_VEHICLES_PER_TILE) return false;
-
-        for (Vehicle other : occupants) {
-            if (other == entrant) continue;
-            VehiclePosition op = other.getPosition();
-            if (op == null) continue;
-
-            int myDx  = to.x - from.x;
-            int myDy  = to.y - from.y;
-            int opDx  = op.getDestination().x - op.getOrigin().x;
-            int opDy  = op.getDestination().y - op.getOrigin().y;
-
-            // Allow head-on passing safely in the other lane
-            boolean headOn = (myDx == -opDx && myDy == -opDy) && (myDx != 0 || myDy != 0);
-            if (headOn) continue;
-
-            // Allow tailgating!
-            boolean sameDir = (myDx == opDx && myDy == opDy) && (myDx != 0 || myDy != 0);
-            if (sameDir) continue;
-
-            // If the occupant is currently vacating the tile, we can tail them
-            if (op.getOrigin().equals(to) && !op.getDestination().equals(to)) {
-                continue;
-            }
-
-            return false;
-        }
-        return true;
     }
 }

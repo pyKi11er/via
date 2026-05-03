@@ -169,10 +169,11 @@ public class VehicleMovementSystem {
         TileCoord nextStep = plannedPath.peek();
         if (nextStep == null) return;
 
-        if (!canEnterTile(v, pos.getOrigin(), nextStep)) {
-            if (canOvertake(state, v, pos, map, plannedPath)) {
-                // begin overtaking, start ramp at 1.0
-                startOvertake(v, pos, nextStep, map);
+        Vehicle slowerVehicleAhead = getSlowerVehicleAhead(v, pos, nextStep);
+
+        if (slowerVehicleAhead != null && !pos.isOvertaking()) {
+            if (canOvertake(state, v, pos, map, nextStep)) {
+                startOvertake(v, pos, nextStep);
                 overtakeRamp.put(v.getId(), 1.0f);
                 markOccupied(nextStep, v);
                 pos.setDestination(nextStep);
@@ -180,10 +181,13 @@ public class VehicleMovementSystem {
                 pos.setProgress(Math.min(1f, pos.getProgress() + appliedSpeed * delta));
                 return;
             }
-            return;
         }
 
-        // Normal move
+        // Normal movement or Tailgating into the next tile
+        if (!canEnterTile(v, pos.getOrigin(), nextStep)) {
+            return; // Blocked! We must wait here.
+        }
+
         pos.setOvertaking(false);
         overtakeRamp.remove(v.getId());
         markOccupied(nextStep, v);
@@ -196,33 +200,54 @@ public class VehicleMovementSystem {
     // Overtaking logic
     // ══════════════════════════════════════════════════════════════════════════
 
+    private Vehicle getSlowerVehicleAhead(Vehicle mover, VehiclePosition pos, TileCoord nextStep) {
+        // Check if we are tailgating in the exact same tile
+        Vehicle aheadInSame = getVehicleAheadInSameTile(mover, pos);
+        if (aheadInSame != null && aheadInSame.getSpeed() < mover.getSpeed()) return aheadInSame;
+
+        // Check if there is a slower vehicle in the next tile
+        Vehicle blocker = getBlockingVehicle(mover, pos.getOrigin(), nextStep);
+        if (blocker != null && blocker.getSpeed() < mover.getSpeed()) return blocker;
+
+        return null;
+    }
+
+
+    private Vehicle getVehicleAheadInSameTile(Vehicle mover, VehiclePosition pos) {
+        Set<Vehicle> occupants = occupancy.get(pos.getOrigin());
+        if (occupants == null) return null;
+
+        for (Vehicle other : occupants) {
+            if (other == mover) continue;
+            VehiclePosition op = other.getPosition();
+            if (op == null) continue;
+
+            if (op.getDestination().equals(pos.getDestination())) {
+                if (op.getProgress() >= pos.getProgress()) {
+                    return other;
+                }
+            }
+        }
+        return null;
+    }
+
     /**
      * Returns true if vehicle v is allowed to overtake right now.
      * Conditions:
      *   1. There is a slower vehicle immediately ahead blocking us.
      *   2. The oncoming lane (opposite direction) is clear for OVERTAKE_LOOK_AHEAD tiles.
      */
-    private boolean canOvertake(GameState state, Vehicle v, VehiclePosition pos,
-                                Map map, Queue<TileCoord> plannedPath) {
-        TileCoord nextStep = plannedPath.peek();
-        if (nextStep == null) return false;
-
-        // 1. Confirm there is a slower blocker ahead
-        Vehicle blocker = getBlockingVehicle(v, pos.getOrigin(), nextStep);
-        if (blocker == null || blocker.getSpeed() >= v.getSpeed()) return false;
-
-        // 2. Travel direction
+    private boolean canOvertake(GameState state, Vehicle v, VehiclePosition pos, Map map, TileCoord nextStep) {
         int dx = nextStep.x - pos.getOrigin().x;
         int dy = nextStep.y - pos.getOrigin().y;
 
-        // 3. Scan oncoming direction for traffic heading TOWARD us
         TileCoord scan = pos.getOrigin();
         for (int i = 0; i < OVERTAKE_LOOK_AHEAD; i++) {
-            scan = new TileCoord(scan.x - dx, scan.y - dy); // look behind (oncoming comes from there)
+            // FIX: scan.x + dx looks AHEAD. The old code used -dx which looked backwards!
+            scan = new TileCoord(scan.x + dx, scan.y + dy);
             if (!map.isWithinBounds(scan)) break;
-            if (hasVehicleMovingIn(state, scan, dx, dy)) return false;
+            if (hasVehicleMovingOpposite(state, scan, dx, dy)) return false;
         }
-
         return true;
     }
 
@@ -230,22 +255,9 @@ public class VehicleMovementSystem {
      * Marks the vehicle as overtaking and applies the visual lane offset
      * perpendicular to its direction of travel.
      */
-    private void startOvertake(Vehicle v, VehiclePosition pos,
-                               TileCoord nextStep, Map map) {
+    private void startOvertake(Vehicle v, VehiclePosition pos, TileCoord nextStep) {
         pos.setOvertaking(true);
-
-        int dx = nextStep.x - pos.getOrigin().x;
-        int dy = nextStep.y - pos.getOrigin().y;
-
-        // Perpendicular offset: if moving horizontally offset vertically, and vice-versa
-        // Positive offset = shift to the "left" of travel direction (oncoming lane side)
-        if (dx != 0) {
-            // Moving east/west — offset north (positive y)
-            pos.setLaneOffset(OVERTAKE_LANE_OFFSET);
-        } else {
-            // Moving north/south — offset east (positive x)
-            pos.setLaneOffset(OVERTAKE_LANE_OFFSET);
-        }
+        pos.setLaneOffset(OVERTAKE_LANE_OFFSET);
     }
 
     /**
@@ -279,7 +291,7 @@ public class VehicleMovementSystem {
      * Returns true if any vehicle in the given tile is moving in direction (dx, dy)
      * — i.e. it's oncoming traffic relative to the overtaker.
      */
-    private boolean hasVehicleMovingIn(GameState state, TileCoord coord, int dx, int dy) {
+    private boolean hasVehicleMovingOpposite(GameState state, TileCoord coord, int myDx, int myDy) {
         Set<Vehicle> occupants = occupancy.get(coord);
         if (occupants == null || occupants.isEmpty()) return false;
         for (Vehicle other : occupants) {
@@ -287,8 +299,8 @@ public class VehicleMovementSystem {
             if (op == null) continue;
             int vdx = op.getDestination().x - op.getOrigin().x;
             int vdy = op.getDestination().y - op.getOrigin().y;
-            // fix: added safeguard to ensure stopped vehicles aren't flagged as oncoming
-            if (vdx == -dx && vdy == -dy && (vdx != 0 || vdy != 0)) return true;
+            // If they are moving opposite to our vector, the lane is NOT safe
+            if (vdx == -myDx && vdy == -myDy && (vdx != 0 || vdy != 0)) return true;
         }
         return false;
     }
@@ -395,45 +407,34 @@ public class VehicleMovementSystem {
         Set<Vehicle> occupants = occupancy.get(to);
         if (occupants == null || occupants.isEmpty()) return true;
 
+        if (occupants.size() >= MAX_VEHICLES_PER_TILE) return false;
+
         for (Vehicle other : occupants) {
             if (other == entrant) continue;
             VehiclePosition op = other.getPosition();
             if (op == null) continue;
 
-            // Allow head-on passing (opposite directions)
             int myDx  = to.x - from.x;
             int myDy  = to.y - from.y;
             int opDx  = op.getDestination().x - op.getOrigin().x;
             int opDy  = op.getDestination().y - op.getOrigin().y;
 
-            //overtaking fix - allow head on passing
-            boolean headOn = (myDx == -opDx && myDy == opDy) && (myDx != 0 || myDy != 0);
+            // allow head-on passing safely in the other lane
+            boolean headOn = (myDx == -opDx && myDy == -opDy) && (myDx != 0 || myDy != 0);
             if (headOn) continue;
 
-            // fix: if the occupant is currently vacating 'to' (leaving), we can enter and tail them
+            // fix: allow tailgating, slower vehicles can enter the tile if following the same direction
+            boolean sameDir = (myDx == opDx && myDy == opDy) && (myDx != 0 || myDy != 0);
+            if (sameDir) continue;
+
+            // if the occupant is currently vacating the tile, we can tail them
             if (op.getOrigin().equals(to) && !op.getDestination().equals(to)) {
                 continue;
             }
-            // Same direction or stationary — block entry
+
             return false;
         }
         return true;
     }
 
-
-    private Vehicle getVehicleAheadInSameTile(Vehicle mover, VehiclePosition pos) {
-        Set<Vehicle> occupants = occupancy.get(pos.getOrigin());
-        if (occupants == null) return null;
-        for (Vehicle other : occupants) {
-            if (other == mover) continue;
-            VehiclePosition op = other.getPosition();
-            if (op == null) continue;
-            if (op.getDestination().equals(pos.getDestination())) {
-                if (op.getProgress() >= pos.getProgress()) {
-                    return other;
-                }
-            }
-        }
-        return null;
-    }
 }

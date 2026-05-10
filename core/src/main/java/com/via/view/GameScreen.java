@@ -346,18 +346,44 @@ public class GameScreen implements Screen {
         if (activeBuildOption != 3 && Gdx.input.isButtonPressed(Input.Buttons.RIGHT))
             mapCamera.translate(-Gdx.input.getDeltaX(), Gdx.input.getDeltaY());
 
-        // Road drag — hold LMB to paint roads continuously
+        // Road drag — hold LMB to paint roads, axis-locked (no diagonal)
         if (activeBuildOption == 0 && Gdx.input.isButtonPressed(Input.Buttons.LEFT)) {
             Vector3 dw = new Vector3(Gdx.input.getX(), Gdx.input.getY(), 0);
             mapCamera.unproject(dw);
-            TileCoord dc = new TileCoord((int)(dw.x / Constants.TILE_SIZE), (int)(dw.y / Constants.TILE_SIZE));
-            if (!dc.equals(lastDragTile) && gameState.getMap().isWithinBounds(dc)) {
-                lastDragTile = dc;
-                try {
-                    roadBuilder.buildRoad(dc);
-                } catch (IllegalArgumentException e) {
-                    if (e.getMessage() != null && e.getMessage().contains("height difference")) {
-                        showFeedback("Cannot build road: terrain height difference is more than 1.", Color.RED);
+            TileCoord raw = new TileCoord((int)(dw.x / Constants.TILE_SIZE), (int)(dw.y / Constants.TILE_SIZE));
+            if (gameState.getMap().isWithinBounds(raw)) {
+                TileCoord dc = raw;
+                if (lastDragTile != null) {
+                    int dx = dc.x - lastDragTile.x;
+                    int dy = dc.y - lastDragTile.y;
+                    // Snap diagonal movement to the dominant axis
+                    if (dx != 0 && dy != 0) {
+                        if (Math.abs(dx) >= Math.abs(dy)) dc = new TileCoord(dc.x, lastDragTile.y);
+                        else                               dc = new TileCoord(lastDragTile.x, dc.y);
+                    }
+                }
+                if (!dc.equals(lastDragTile)) {
+                    // Fill tiles skipped by fast dragging
+                    if (lastDragTile != null) {
+                        int dx = dc.x - lastDragTile.x;
+                        int dy = dc.y - lastDragTile.y;
+                        int steps = Math.max(Math.abs(dx), Math.abs(dy));
+                        int sx = dx == 0 ? 0 : (dx > 0 ? 1 : -1);
+                        int sy = dy == 0 ? 0 : (dy > 0 ? 1 : -1);
+                        for (int i = 1; i < steps; i++) {
+                            TileCoord mid = new TileCoord(lastDragTile.x + sx * i, lastDragTile.y + sy * i);
+                            if (gameState.getMap().isWithinBounds(mid)) {
+                                try { roadBuilder.buildRoad(mid); } catch (IllegalArgumentException ignored) {}
+                            }
+                        }
+                    }
+                    lastDragTile = dc;
+                    try {
+                        roadBuilder.buildRoad(dc);
+                    } catch (IllegalArgumentException e) {
+                        if (e.getMessage() != null && e.getMessage().contains("height difference")) {
+                            showFeedback("Cannot build road: terrain height difference is more than 1.", Color.RED);
+                        }
                     }
                 }
             }

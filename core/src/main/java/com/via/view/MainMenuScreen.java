@@ -8,8 +8,10 @@ import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.Texture;
+import com.badlogic.gdx.graphics.g2d.Animation;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.GlyphLayout;
+import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.graphics.g2d.freetype.FreeTypeFontGenerator;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.math.Rectangle;
@@ -94,6 +96,16 @@ public class MainMenuScreen extends InputAdapter implements Screen {
     // ── Textures (logo only — button/panel kept for dialogs)
     private final Texture texLogo;
 
+    private Texture texAnim;
+    private Animation<TextureRegion> aboutAnim;
+    private Texture texHelpAnim;
+    private Animation<TextureRegion> helpAnim;
+    private float animTime = 0f;
+    private static final int ANIM_COLS        = 12;
+    private static final int ANIM_FRAME_COUNT = 52;
+    private static final int HELP_FRAME_COUNT = 106;
+    private static final int ANIM_FRAME_SIZE  = 150;
+
     //
 
     public MainMenuScreen(VIA game) {
@@ -127,6 +139,34 @@ public class MainMenuScreen extends InputAdapter implements Screen {
         this.texLogo   = new Texture("logo.png");
         this.texButton = new Texture("button.png");
         this.texPanel  = new Texture("panel.png");
+
+        texAnim = new Texture(Gdx.files.internal("about_anim.png"));
+        TextureRegion[][] tmp = TextureRegion.split(texAnim, ANIM_FRAME_SIZE, ANIM_FRAME_SIZE);
+        TextureRegion[] frames = new TextureRegion[ANIM_FRAME_COUNT];
+        int fi = 0;
+        outer:
+        for (TextureRegion[] row : tmp) {
+            for (TextureRegion cell : row) {
+                if (fi >= ANIM_FRAME_COUNT) break outer;
+                frames[fi++] = cell;
+            }
+        }
+        aboutAnim = new Animation<>(1 / 10f, frames);
+        aboutAnim.setPlayMode(Animation.PlayMode.LOOP);
+
+        texHelpAnim = new Texture(Gdx.files.internal("help_anim.png"));
+        TextureRegion[][] tmpH = TextureRegion.split(texHelpAnim, ANIM_FRAME_SIZE, ANIM_FRAME_SIZE);
+        TextureRegion[] helpFrames = new TextureRegion[HELP_FRAME_COUNT];
+        int hi = 0;
+        outerH:
+        for (TextureRegion[] row : tmpH) {
+            for (TextureRegion cell : row) {
+                if (hi >= HELP_FRAME_COUNT) break outerH;
+                helpFrames[hi++] = cell;
+            }
+        }
+        helpAnim = new Animation<>(1 / 10f, helpFrames);
+        helpAnim.setPlayMode(Animation.PlayMode.LOOP);
 
         // Background simulation — initialize with a fresh game world
         this.bgState    = MapInitializer.createNewGame();
@@ -277,6 +317,8 @@ public class MainMenuScreen extends InputAdapter implements Screen {
                 rAbout.y + rAbout.height * 0.78f,
                 aboutHover ? new Color(0.80f, 0.86f, 1.0f, 0.95f)
                            : new Color(0.48f, 0.58f, 0.80f, 0.60f));
+
+        if (dialog == Dialog.ABOUT || dialog == Dialog.HELP) animTime += delta;
 
         // Dialog
         if (dialog != Dialog.NONE) renderDialog();
@@ -454,11 +496,17 @@ public class MainMenuScreen extends InputAdapter implements Screen {
             case ABOUT:
                 drawCentered(buttonFont, "About", cx, hTY, Color.WHITE);
                 drawCentered(smallFont, "VIA - Mini Transport Tycoon", cx,
-                        rDialog.y + rDialog.height * 0.72f, new Color(0.90f, 0.93f, 1f, 1f));
+                        rDialog.y + rDialog.height * 0.80f, new Color(0.90f, 0.93f, 1f, 1f));
                 drawCentered(smallFont, "Developed by: Vuk, Hayk, Valerii, Andrii", cx,
-                        rDialog.y + rDialog.height * 0.58f, new Color(0.90f, 0.93f, 1f, 1f));
+                        rDialog.y + rDialog.height * 0.66f, new Color(0.90f, 0.93f, 1f, 1f));
                 drawCentered(smallFont, "ELTE 2025/2026", cx,
-                        rDialog.y + rDialog.height * 0.44f, new Color(0.90f, 0.93f, 1f, 1f));
+                        rDialog.y + rDialog.height * 0.52f, new Color(0.90f, 0.93f, 1f, 1f));
+                float vs = Math.min(rDialog.width * 0.30f, rDialog.height * 0.20f);
+                TextureRegion animFrame = aboutAnim.getKeyFrame(animTime);
+                game.batch.begin();
+                game.batch.setColor(Color.WHITE);
+                game.batch.draw(animFrame, cx - vs * 0.5f, rDialog.y + rDialog.height * 0.27f, vs, vs);
+                game.batch.end();
                 drawButton(rDlgClose, "Close");
                 break;
 
@@ -472,9 +520,15 @@ public class MainMenuScreen extends InputAdapter implements Screen {
                 };
                 for (int i = 0; i < tips.length; i++) {
                     drawCentered(smallFont, tips[i], cx,
-                            rDialog.y + rDialog.height * 0.72f - i * rDialog.height * 0.12f,
+                            rDialog.y + rDialog.height * 0.80f - i * rDialog.height * 0.10f,
                             new Color(0.90f, 0.93f, 1f, 1f));
                 }
+                float hvs = Math.min(rDialog.width * 0.30f, rDialog.height * 0.20f);
+                TextureRegion helpFrame = helpAnim.getKeyFrame(animTime);
+                game.batch.begin();
+                game.batch.setColor(Color.WHITE);
+                game.batch.draw(helpFrame, cx - hvs * 0.5f, rDialog.y + rDialog.height * 0.27f, hvs, hvs);
+                game.batch.end();
                 drawButton(rDlgClose, "Close");
                 break;
 
@@ -700,6 +754,8 @@ public class MainMenuScreen extends InputAdapter implements Screen {
         texLogo.dispose();
         texButton.dispose();
         texPanel.dispose();
+        texAnim.dispose();
+        texHelpAnim.dispose();
         bgRenderer.dispose();
     }
 }

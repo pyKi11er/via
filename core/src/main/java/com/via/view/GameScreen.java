@@ -125,6 +125,9 @@ public class GameScreen implements Screen {
     private float feedbackTimer = 0f;
     private Color feedbackColor = Color.WHITE;
 
+    private Texture texMeme;
+    private float memeTimer = 0f;
+
     // tile under the cursor in build mode
     private TileCoord hoveredTile = null;
     private TileCoord lastDragTile = null;
@@ -162,6 +165,8 @@ public class GameScreen implements Screen {
         texPanel = new Texture(Gdx.files.internal("panel.png"));
         texButton.setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear);
         texPanel.setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear);
+        texMeme = new Texture(Gdx.files.internal("meme.png"));
+        texMeme.setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear);
 
         buildLayout(Gdx.graphics.getWidth(), Gdx.graphics.getHeight());
     }
@@ -213,6 +218,7 @@ public class GameScreen implements Screen {
     @Override
     public void render(float delta) {
         if (feedbackTimer > 0) feedbackTimer -= delta;
+        if (memeTimer > 0) memeTimer -= delta;
 
         // advance simulation by one tick
         gameEngine.update();
@@ -245,6 +251,7 @@ public class GameScreen implements Screen {
         if (showRouteAssignDialog) drawRouteAssignDialog();
         if (showGarageDetailDialog) drawGarageDetailDialog();
         drawFeedback();
+        drawMeme();
     }
 
     // converts mouse position to world tile coordinates
@@ -322,6 +329,7 @@ public class GameScreen implements Screen {
             try {
                 SaveManager.saveGame(gameState, "quicksave");
                 showFeedback("Game saved!", Color.GREEN);
+                memeTimer = 1f;
             } catch (IOException e) {
                 showFeedback("Save failed!", Color.RED);
             }
@@ -1215,6 +1223,16 @@ public class GameScreen implements Screen {
         feedbackTimer = 3f;
     }
 
+    private void drawMeme() {
+        if (memeTimer <= 0) return;
+        float sw = Gdx.graphics.getWidth(), sh = Gdx.graphics.getHeight();
+        float mw = texMeme.getWidth(), mh = texMeme.getHeight();
+        float x = (sw - mw) / 2f, y = (sh - mh) / 2f;
+        batch.begin();
+        batch.draw(texMeme, x, y);
+        batch.end();
+    }
+
     private void drawFeedback() {
         if (feedbackTimer <= 0) return;
         gl.setText(font, feedbackMsg);
@@ -1481,6 +1499,7 @@ public class GameScreen implements Screen {
         font.dispose();
         texButton.dispose();
         texPanel.dispose();
+        texMeme.dispose();
         renderer.dispose();
     }
 }

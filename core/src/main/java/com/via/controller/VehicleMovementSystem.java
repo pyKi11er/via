@@ -21,11 +21,22 @@ public class VehicleMovementSystem {
     private static final int   STOP_WAIT_TICKS         = 60;
     private static final int   OVERTAKE_LOOK_AHEAD     = 3;
     private static final float OVERTAKE_LANE_OFFSET    = 0.35f;
+    private static final float LANE_LERP_SPEED         = 6.0f;
+    private static final int   STUCK_THRESHOLD         = 45;  // ticks before forcing path recalc
+    private static final int   CONGESTION_WEIGHT       = 4;   // extra cost per vehicle on a tile
 
-    private final java.util.Map<UUID, Float> overtakeRamp = new HashMap<>();
+    private final java.util.Map<UUID, Float>   overtakeRamp = new HashMap<>();
+    private final java.util.Map<UUID, Integer> stuckTicks   = new HashMap<>();
     private final EconomySystem economySystem;
     private final java.util.Map<TileCoord, Set<Vehicle>> occupancy = new HashMap<>();
     private final java.util.Map<UUID, Queue<TileCoord>>  pathCache = new HashMap<>();
+
+    private static final class DNode implements Comparable<DNode> {
+        final TileCoord coord;
+        final int cost;
+        DNode(TileCoord c, int cost) { this.coord = c; this.cost = cost; }
+        @Override public int compareTo(DNode o) { return Integer.compare(cost, o.cost); }
+    }
 
     public VehicleMovementSystem(EconomySystem economySystem) {
         this.economySystem = Objects.requireNonNull(economySystem, "economySystem");
@@ -59,6 +70,13 @@ public class VehicleMovementSystem {
     }
 
     private void updateVehicleMovement(GameState state, Vehicle v, VehiclePosition pos, Map map, float delta) {
+        // Smooth lane transition — runs every tick regardless of movement state
+        float targetLane = pos.isOvertaking() ? 1.0f : 0.0f;
+        float vis = pos.getVisualLaneOffset();
+        float rate = delta * LANE_LERP_SPEED;
+        if (vis < targetLane) pos.setVisualLaneOffset(Math.min(vis + rate, targetLane));
+        else                  pos.setVisualLaneOffset(Math.max(vis - rate, targetLane));
+
         // 1. Process Waiting State
         if (v.getStopWaitTicks() > 0) {
             if (v.isMaintaining() && v.getStopWaitTicks() == 1) {
@@ -143,7 +161,7 @@ public class VehicleMovementSystem {
 
         Queue<TileCoord> plannedPath = pathCache.get(v.getId());
         if (plannedPath == null || plannedPath.isEmpty()) {
-            plannedPath = findPathBfs(map, pos.getOrigin(), nextStop.getLocation());
+            plannedPath = findPathDijkstra(map, pos.getOrigin(), nextStop.getLocation());
             if (!plannedPath.isEmpty()) {
                 pathCache.put(v.getId(), plannedPath);
             } else {
@@ -175,10 +193,16 @@ public class VehicleMovementSystem {
 
         // T-Bone Blocker & Tailgater
         if (!canEnterTile(v, pos.getOrigin(), nextStep)) {
+            int stuck = stuckTicks.merge(v.getId(), 1, Integer::sum);
+            if (stuck >= STUCK_THRESHOLD) {
+                stuckTicks.put(v.getId(), 0);
+                pathCache.remove(v.getId()); // recalc via Dijkstra next tick
+            }
             return; // Blocked at intersection! Wait here.
         }
 
         // Safely entered next tile
+        stuckTicks.remove(v.getId());
         if (!pos.isOvertaking()) overtakeRamp.remove(v.getId());
         markOccupied(nextStep, v);
         pos.setDestination(nextStep);
@@ -409,25 +433,33 @@ public class VehicleMovementSystem {
         return null;
     }
 
-    private Queue<TileCoord> findPathBfs(Map map, TileCoord start, TileCoord goal) {
+    private Queue<TileCoord> findPathDijkstra(Map map, TileCoord start, TileCoord goal) {
         if (start.equals(goal)) return new LinkedList<>();
 
-        Queue<TileCoord> queue = new LinkedList<>();
+        PriorityQueue<DNode> open = new PriorityQueue<>();
         java.util.Map<TileCoord, TileCoord> cameFrom = new HashMap<>();
-        Set<TileCoord> visited = new HashSet<>();
+        java.util.Map<TileCoord, Integer>   bestCost  = new HashMap<>();
 
-        queue.add(start);
-        visited.add(start);
+        open.add(new DNode(start, 0));
+        bestCost.put(start, 0);
 
-        while (!queue.isEmpty()) {
-            TileCoord current = queue.poll();
-            if (current.equals(goal)) break;
+        while (!open.isEmpty()) {
+            DNode cur = open.poll();
+            if (cur.coord.equals(goal)) break;
+            if (cur.cost > bestCost.getOrDefault(cur.coord, Integer.MAX_VALUE)) continue;
 
-            for (TileCoord neighbor : map.getAdjacentCoords(current)) {
-                if (!visited.contains(neighbor) && (isTraversable(map, neighbor) || neighbor.equals(goal))) {
-                    queue.add(neighbor);
-                    visited.add(neighbor);
-                    cameFrom.put(neighbor, current);
+            for (TileCoord nb : map.getAdjacentCoords(cur.coord)) {
+                if (!isTraversable(map, nb) && !nb.equals(goal)) continue;
+
+                // Base cost 1 + penalty for each vehicle currently on that tile
+                Set<Vehicle> occ = occupancy.get(nb);
+                int tileCost = 1 + (occ != null ? occ.size() * CONGESTION_WEIGHT : 0);
+                int newCost  = cur.cost + tileCost;
+
+                if (newCost < bestCost.getOrDefault(nb, Integer.MAX_VALUE)) {
+                    bestCost.put(nb, newCost);
+                    cameFrom.put(nb, cur.coord);
+                    open.add(new DNode(nb, newCost));
                 }
             }
         }

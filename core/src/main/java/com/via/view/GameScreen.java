@@ -131,6 +131,7 @@ public class GameScreen implements Screen {
     // tile under the cursor in build mode
     private TileCoord hoveredTile = null;
     private TileCoord lastDragTile = null;
+    private Boolean   dragHorizontal = null; // null = axis not locked yet
 
     // Garage Detail UI
     private boolean showGarageDetailDialog = false;
@@ -346,7 +347,7 @@ public class GameScreen implements Screen {
         if (activeBuildOption != 3 && Gdx.input.isButtonPressed(Input.Buttons.RIGHT))
             mapCamera.translate(-Gdx.input.getDeltaX(), Gdx.input.getDeltaY());
 
-        // Road drag — hold LMB to paint roads, axis-locked (no diagonal)
+        // Road drag — hold LMB to paint roads, axis locked for entire drag
         if (activeBuildOption == 0 && Gdx.input.isButtonPressed(Input.Buttons.LEFT)) {
             Vector3 dw = new Vector3(Gdx.input.getX(), Gdx.input.getY(), 0);
             mapCamera.unproject(dw);
@@ -354,12 +355,17 @@ public class GameScreen implements Screen {
             if (gameState.getMap().isWithinBounds(raw)) {
                 TileCoord dc = raw;
                 if (lastDragTile != null) {
-                    int dx = dc.x - lastDragTile.x;
-                    int dy = dc.y - lastDragTile.y;
-                    // Snap diagonal movement to the dominant axis
-                    if (dx != 0 && dy != 0) {
-                        if (Math.abs(dx) >= Math.abs(dy)) dc = new TileCoord(dc.x, lastDragTile.y);
-                        else                               dc = new TileCoord(lastDragTile.x, dc.y);
+                    // Lock axis on first movement, keep it for the whole drag
+                    if (dragHorizontal == null) {
+                        int dx = dc.x - lastDragTile.x;
+                        int dy = dc.y - lastDragTile.y;
+                        if (dx != 0 || dy != 0)
+                            dragHorizontal = Math.abs(dx) >= Math.abs(dy);
+                    }
+                    // Clamp to locked axis
+                    if (dragHorizontal != null) {
+                        if (dragHorizontal) dc = new TileCoord(dc.x, lastDragTile.y);
+                        else                dc = new TileCoord(lastDragTile.x, dc.y);
                     }
                 }
                 if (!dc.equals(lastDragTile)) {
@@ -388,7 +394,10 @@ public class GameScreen implements Screen {
                 }
             }
         }
-        if (!Gdx.input.isButtonPressed(Input.Buttons.LEFT)) lastDragTile = null;
+        if (!Gdx.input.isButtonPressed(Input.Buttons.LEFT)) {
+            lastDragTile = null;
+            dragHorizontal = null;
+        }
 
         // Terraform mode: left-click raises, right-click lowers (handled before the left-only guard)
         if (activeBuildOption == 3 && Gdx.input.justTouched()) {

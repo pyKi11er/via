@@ -348,8 +348,11 @@ public class MainMenuScreen extends InputAdapter implements Screen {
 
             float panelFraction       = panelW / width;
             float visibleCentreFrac   = panelFraction + (1f - panelFraction) * 0.5f; // e.g. 0.65
-            bgCamX = vx - bgCamera.viewportWidth * (visibleCentreFrac - 0.5f);
-            bgCamY = vy;
+            float targetX = vx - bgCamera.viewportWidth * (visibleCentreFrac - 0.5f);
+            float targetY = vy;
+            float factor  = Math.min(delta * 3f, 1f);
+            bgCamX = lerp(bgCamX, targetX, factor);
+            bgCamY = lerp(bgCamY, targetY, factor);
         }
 
         float halfVH = bgCamera.viewportHeight * 0.5f;

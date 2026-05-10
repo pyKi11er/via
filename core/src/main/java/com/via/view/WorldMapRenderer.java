@@ -16,9 +16,10 @@ import com.via.model.vehicle.VehiclePosition;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 public class WorldMapRenderer {
-
+    private final java.util.Map<UUID, Direction> lastFacing = new java.util.HashMap<>();
     private static final int TILE_SIZE   = Constants.TILE_SIZE;
     private static final int SPRITE_SIZE = 8;
 
@@ -291,21 +292,35 @@ public class WorldMapRenderer {
     }
 
     private TextureRegion getVehicleSprite(Vehicle v) {
-        int idx = getMovementDirection(v.getPosition()).ordinal();
+        // Updated to pass the Vehicle object itself to get access to its ID
+        int idx = getMovementDirection(v).ordinal();
         return switch (v.getType()) {
             case TRUCK, MINI_TRUCK, HEAVY_TRUCK -> truckSprites[idx];
             case BUS, EXPRESS_BUS, CITY_BUS     -> busSprites[idx];
         };
     }
 
-    private Direction getMovementDirection(VehiclePosition pos) {
+    private Direction getMovementDirection(Vehicle v) {
+        VehiclePosition pos = v.getPosition();
         if (pos == null) return Direction.N;
+
         int dx = pos.getDestination().x - pos.getOrigin().x;
         int dy = pos.getDestination().y - pos.getOrigin().y;
-        if (dx > 0) return Direction.E;
-        if (dx < 0) return Direction.W;
-        if (dy > 0) return Direction.N;  // Higher Y = North (up)
-        return Direction.S;  // Lower Y = South (down)
+
+        Direction dir = null;
+        if (dx > 0) dir = Direction.E;
+        else if (dx < 0) dir = Direction.W;
+        else if (dy > 0) dir = Direction.N;
+        else if (dy < 0) dir = Direction.S;
+
+        if (dir != null) {
+            // save the direction so we remember it if the vehicle stops
+            lastFacing.put(v.getId(), dir);
+            return dir;
+        }
+
+        // If dx=0 and dy=0 (stopped), retrieve the last known direction instead of defaulting to South
+        return lastFacing.getOrDefault(v.getId(), Direction.S);
     }
 
     private void draw(TextureRegion r, float x, float y) {

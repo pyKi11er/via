@@ -17,6 +17,8 @@ public class VehiclePosition implements Serializable {
     // Overtaking state
     private boolean overtaking = false;
     private float laneOffset = 0f; // visual offset perpendicular to direction of travel
+    // Smoothly animated 0=right lane, 1=left lane — transient so saves reset it cleanly
+    private transient float visualLaneOffset = 0f;
 
     /**
      * Constructs a new VehiclePosition with the specified origin and destination.
@@ -105,6 +107,9 @@ public class VehiclePosition implements Serializable {
      * @param laneOffset the new lane offset value
      */
     public void setLaneOffset(float laneOffset) { this.laneOffset = laneOffset; }
+
+    public float getVisualLaneOffset() { return visualLaneOffset; }
+    public void setVisualLaneOffset(float v) { this.visualLaneOffset = v; }
 
     /**
      * Returns the origin tile (alias for {@link #getOrigin()}).

@@ -281,11 +281,10 @@ public class WorldMapRenderer {
             else if (dy > 0) laneX =  normalOffset; // north → east lane
             else if (dy < 0) laneX = -normalOffset; // south → west lane
 
-            // Overtaking: snap to opposite lane immediately, no animation
-            if (pos.isOvertaking()) {
-                laneX = -laneX;
-                laneY = -laneY;
-            }
+            // Smooth lane transition: visualLaneOffset 0=right lane, 1=left lane
+            float t = pos.getVisualLaneOffset();
+            laneX *= (1f - 2f * t);
+            laneY *= (1f - 2f * t);
 
             draw(getVehicleSprite(v), sx + laneX, sy + laneY);
         }

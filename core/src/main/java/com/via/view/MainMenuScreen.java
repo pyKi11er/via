@@ -99,6 +99,7 @@ public class MainMenuScreen extends InputAdapter implements Screen {
 
     private Texture texExitMeme;
     private Texture texSettingsMeme;
+    private Texture texLoadMeme;
     private Texture texAnim;
     private Animation<TextureRegion> aboutAnim;
     private Texture texHelpAnim;
@@ -147,6 +148,8 @@ public class MainMenuScreen extends InputAdapter implements Screen {
         texExitMeme.setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear);
         texSettingsMeme = new Texture(Gdx.files.internal("settings_meme.png"));
         texSettingsMeme.setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear);
+        texLoadMeme = new Texture(Gdx.files.internal("load_meme.png"));
+        texLoadMeme.setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear);
         texAnim = new Texture(Gdx.files.internal("about_anim.png"));
         TextureRegion[][] tmp = TextureRegion.split(texAnim, ANIM_FRAME_SIZE, ANIM_FRAME_SIZE);
         TextureRegion[] frames = new TextureRegion[ANIM_FRAME_COUNT];
@@ -495,6 +498,14 @@ public class MainMenuScreen extends InputAdapter implements Screen {
 
             case LOAD_GAME:
                 drawCentered(buttonFont, "Load Game", cx, hTY, Color.WHITE);
+                float lmsz = Math.min(rDialog.width * 0.22f, rDialog.height * 0.30f);
+                game.batch.begin();
+                game.batch.setColor(1f, 1f, 1f, 1f);
+                game.batch.draw(texLoadMeme,
+                        rDialog.x + rDialog.width  - lmsz - rDialog.width  * 0.04f,
+                        rDialog.y + rDialog.height * 0.04f,
+                        lmsz, lmsz);
+                game.batch.end();
                 rSaveEntries.clear();
                 if (saveFiles.length == 0) {
                     drawCentered(smallFont, "No save files found.", cx,
@@ -799,6 +810,7 @@ public class MainMenuScreen extends InputAdapter implements Screen {
         texPanel.dispose();
         texExitMeme.dispose();
         texSettingsMeme.dispose();
+        texLoadMeme.dispose();
         texAnim.dispose();
         texHelpAnim.dispose();
         bgRenderer.dispose();

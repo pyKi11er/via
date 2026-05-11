@@ -98,6 +98,7 @@ public class MainMenuScreen extends InputAdapter implements Screen {
     private final Texture texLogo;
 
     private Texture texExitMeme;
+    private Texture texSettingsMeme;
     private Texture texAnim;
     private Animation<TextureRegion> aboutAnim;
     private Texture texHelpAnim;
@@ -144,6 +145,8 @@ public class MainMenuScreen extends InputAdapter implements Screen {
 
         texExitMeme = new Texture(Gdx.files.internal("exit_meme.png"));
         texExitMeme.setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear);
+        texSettingsMeme = new Texture(Gdx.files.internal("settings_meme.png"));
+        texSettingsMeme.setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear);
         texAnim = new Texture(Gdx.files.internal("about_anim.png"));
         TextureRegion[][] tmp = TextureRegion.split(texAnim, ANIM_FRAME_SIZE, ANIM_FRAME_SIZE);
         TextureRegion[] frames = new TextureRegion[ANIM_FRAME_COUNT];
@@ -584,6 +587,14 @@ public class MainMenuScreen extends InputAdapter implements Screen {
                         isFs ? new Color(0.18f, 0.65f, 0.35f, 1f)
                              : new Color(0.42f, 0.46f, 0.62f, 1f));
 
+                float msz = Math.min(rDialog.width * 0.22f, rDialog.height * 0.30f);
+                float mx2 = rDialog.x + rDialog.width  - msz - rDialog.width  * 0.04f;
+                float my2 = rDialog.y + rDialog.height - msz - rDialog.height * 0.16f;
+                game.batch.begin();
+                game.batch.setColor(1f, 1f, 1f, 1f);
+                game.batch.draw(texSettingsMeme, mx2, my2, msz, msz);
+                game.batch.end();
+
                 drawButton(rDlgClose, "Back");
                 break;
             }
@@ -787,6 +798,7 @@ public class MainMenuScreen extends InputAdapter implements Screen {
         texButton.dispose();
         texPanel.dispose();
         texExitMeme.dispose();
+        texSettingsMeme.dispose();
         texAnim.dispose();
         texHelpAnim.dispose();
         bgRenderer.dispose();

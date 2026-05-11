@@ -96,6 +96,7 @@ public class MainMenuScreen extends InputAdapter implements Screen {
     // ── Textures (logo only — button/panel kept for dialogs)
     private final Texture texLogo;
 
+    private Texture texExitMeme;
     private Texture texAnim;
     private Animation<TextureRegion> aboutAnim;
     private Texture texHelpAnim;
@@ -140,6 +141,8 @@ public class MainMenuScreen extends InputAdapter implements Screen {
         this.texButton = new Texture("button.png");
         this.texPanel  = new Texture("panel.png");
 
+        texExitMeme = new Texture(Gdx.files.internal("exit_meme.png"));
+        texExitMeme.setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear);
         texAnim = new Texture(Gdx.files.internal("about_anim.png"));
         TextureRegion[][] tmp = TextureRegion.split(texAnim, ANIM_FRAME_SIZE, ANIM_FRAME_SIZE);
         TextureRegion[] frames = new TextureRegion[ANIM_FRAME_COUNT];
@@ -575,7 +578,12 @@ public class MainMenuScreen extends InputAdapter implements Screen {
             case EXIT:
                 drawCentered(buttonFont, "Exit", cx, hTY, Color.WHITE);
                 drawCentered(smallFont, "Are you sure you want to quit?", cx,
-                        rDialog.y + rDialog.height * 0.58f, new Color(0.92f, 0.92f, 1f, 1f));
+                        rDialog.y + rDialog.height * 0.76f, new Color(0.92f, 0.92f, 1f, 1f));
+                float emSize = Math.min(rDialog.width * 0.38f, rDialog.height * 0.45f);
+                game.batch.begin();
+                game.batch.setColor(1f, 1f, 1f, 1f);
+                game.batch.draw(texExitMeme, cx - emSize / 2f, rDlgBtn1.y + rDlgBtn1.height + 10f, emSize, emSize);
+                game.batch.end();
                 drawButton(rDlgBtn1, "Yes, Exit");
                 drawButton(rDlgBtn2, "Cancel");
                 break;
@@ -757,6 +765,7 @@ public class MainMenuScreen extends InputAdapter implements Screen {
         texLogo.dispose();
         texButton.dispose();
         texPanel.dispose();
+        texExitMeme.dispose();
         texAnim.dispose();
         texHelpAnim.dispose();
         bgRenderer.dispose();

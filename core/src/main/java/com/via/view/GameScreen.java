@@ -72,6 +72,8 @@ public class GameScreen implements Screen {
 
     private Rectangle btnExit;
     private boolean showExitDialog = false;
+    private boolean showExitConfirm = false;
+    private boolean exitConfirmReady = false;
     private Rectangle rDialog;
     private Rectangle rBtnSave;
     private Rectangle rBtnMainMenu;
@@ -126,6 +128,7 @@ public class GameScreen implements Screen {
     private Color feedbackColor = Color.WHITE;
 
     private Texture texMeme;
+    private Texture texExitMeme;
     private float memeTimer = 0f;
 
     // tile under the cursor in build mode
@@ -168,6 +171,8 @@ public class GameScreen implements Screen {
         texPanel.setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear);
         texMeme = new Texture(Gdx.files.internal("meme.png"));
         texMeme.setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear);
+        texExitMeme = new Texture(Gdx.files.internal("exit_meme.png"));
+        texExitMeme.setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear);
 
         buildLayout(Gdx.graphics.getWidth(), Gdx.graphics.getHeight());
     }
@@ -249,6 +254,7 @@ public class GameScreen implements Screen {
 
         if (showPopup) drawPopup();
         if (showExitDialog) drawExitDialog();
+        if (showExitConfirm) drawExitConfirm();
         if (showRouteAssignDialog) drawRouteAssignDialog();
         if (showGarageDetailDialog) drawGarageDetailDialog();
         drawFeedback();
@@ -582,7 +588,7 @@ public class GameScreen implements Screen {
             return;
         }
         if (rBtnMainMenu.contains(mx, my)) { showExitDialog = false; game.setScreen(new MainMenuScreen(game)); return; }
-        if (rBtnExitGame.contains(mx, my)) { Gdx.app.exit(); return; }
+        if (rBtnExitGame.contains(mx, my)) { showExitDialog = false; showExitConfirm = true; exitConfirmReady = false; return; }
         if (rBtnClose.contains(mx, my)) showExitDialog = false;
     }
 
@@ -1252,6 +1258,40 @@ public class GameScreen implements Screen {
         drawBtn(rBtnClose,    "Close",     new Color(0.35f, 0.38f, 0.48f, 1f));
     }
 
+    private void drawExitConfirm() {
+        float sw = Gdx.graphics.getWidth(), sh = Gdx.graphics.getHeight();
+        float memeW = 320f, memeH = 320f;
+        float memeX = (sw - memeW) / 2f, memeY = sh / 2f - 20f;
+        float btnW = 140f, btnH = 46f;
+        Rectangle rYes = new Rectangle(sw / 2f - btnW - 16f, memeY - btnH - 20f, btnW, btnH);
+        Rectangle rNo  = new Rectangle(sw / 2f + 16f,        memeY - btnH - 20f, btnW, btnH);
+
+        if (!exitConfirmReady) {
+            exitConfirmReady = true;
+        } else if (Gdx.input.justTouched()) {
+            float mx = Gdx.input.getX(), my = sh - Gdx.input.getY();
+            if (rYes.contains(mx, my)) { Gdx.app.exit(); return; }
+            if (rNo.contains(mx, my))  { showExitConfirm = false; return; }
+        }
+
+        Gdx.gl.glEnable(GL20.GL_BLEND);
+        Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
+        sr.begin(ShapeRenderer.ShapeType.Filled);
+        sr.setColor(0f, 0f, 0f, 0.82f);
+        sr.rect(0, 0, sw, sh);
+        sr.end();
+        Gdx.gl.glDisable(GL20.GL_BLEND);
+
+        batch.begin();
+        batch.setColor(1f, 1f, 1f, 1f);
+        batch.draw(texExitMeme, memeX, memeY, memeW, memeH);
+        batch.end();
+
+        drawCentred("Are you sure?", sw / 2f, memeY + memeH + 24f, Color.WHITE);
+        drawBtn(rYes, "Yes, quit",  new Color(0.72f, 0.18f, 0.18f, 1f));
+        drawBtn(rNo,  "Cancel",     new Color(0.35f, 0.38f, 0.48f, 1f));
+    }
+
     private void showFeedback(String message, Color color) {
         feedbackMsg = message;
         feedbackColor = color;
@@ -1535,6 +1575,7 @@ public class GameScreen implements Screen {
         texButton.dispose();
         texPanel.dispose();
         texMeme.dispose();
+        texExitMeme.dispose();
         renderer.dispose();
     }
 }

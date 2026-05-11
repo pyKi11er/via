@@ -58,8 +58,8 @@ public class MainMenuScreen extends InputAdapter implements Screen {
     private String[] saveFiles = new String[0];
     private final java.util.List<Rectangle> rSaveEntries = new java.util.ArrayList<>();
 
-    private boolean showResolutionDropdown = false;
-    private java.util.List<com.badlogic.gdx.Graphics.DisplayMode> cachedModes = new java.util.ArrayList<>();
+    private static final int[][] RESOLUTIONS = {{1280,720},{1366,768},{1600,900},{1920,1080},{2560,1440}};
+    private int resolutionIndex = 0;
 
     private boolean focusPlayer = true;
     private String  playerName  = "Player";
@@ -74,6 +74,7 @@ public class MainMenuScreen extends InputAdapter implements Screen {
     private Rectangle rLogo;
     private Rectangle rNew, rLoad, rAbout, rSettings, rHelp, rExit;
     private Rectangle rDialog, rField1, rField2, rDlgBtn1, rDlgBtn2, rDlgClose;
+    private Rectangle rBtnFullscreen, rBtnResolution;
 
     // ── Button accent colors
     private static final Color COL_NEW      = new Color(0.18f, 0.75f, 0.40f, 1f);
@@ -248,6 +249,10 @@ public class MainMenuScreen extends InputAdapter implements Screen {
         rDlgBtn1  = new Rectangle(dlgX + dlgW * 0.11f,              bY, bW, bH);
         rDlgBtn2  = new Rectangle(dlgX + dlgW - dlgW * 0.11f - bW, bY, bW, bH);
         rDlgClose = new Rectangle(dlgX + dlgW * 0.5f - bW * 0.5f,  bY, bW, bH);
+
+        float btnColX = dlgX + dlgW * 0.52f, btnColW = dlgW * 0.40f, rowH = dlgH * 0.12f;
+        rBtnResolution = new Rectangle(btnColX, dlgY + dlgH * 0.55f, btnColW, rowH);
+        rBtnFullscreen = new Rectangle(btnColX, dlgY + dlgH * 0.35f, btnColW, rowH);
     }
 
 
@@ -410,9 +415,15 @@ public class MainMenuScreen extends InputAdapter implements Screen {
 
     /** Classic texture button used inside dialogs. */
     private void drawButton(Rectangle r, String label) {
+        drawButtonColored(r, label, null);
+    }
+
+    private void drawButtonColored(Rectangle r, String label, Color tint) {
         boolean hover = isHovered(r);
+        Color base = tint != null ? tint : Color.WHITE;
+        Color draw = hover ? new Color(base.r * 1.15f, base.g * 1.15f, base.b * 1.15f, 1f) : base;
         game.batch.begin();
-        game.batch.setColor(hover ? new Color(0.82f, 0.82f, 0.82f, 1f) : Color.WHITE);
+        game.batch.setColor(draw);
         game.batch.draw(texButton, r.x, r.y, r.width, r.height);
         game.batch.end();
 
@@ -538,42 +549,44 @@ public class MainMenuScreen extends InputAdapter implements Screen {
                 drawButton(rDlgClose, "Close");
                 break;
 
-            case SETTINGS:
+            case SETTINGS: {
                 drawCentered(buttonFont, "Settings", cx, hTY, Color.WHITE);
-                drawCentered(smallFont, "Change Resolution", cx,
-                        rDialog.y + rDialog.height * 0.76f, Color.WHITE);
 
-                Rectangle rDrop = new Rectangle(rField1.x,
-                        rField1.y + rField1.height * 0.5f, rField1.width, rField1.height);
-                drawButton(rDrop, Gdx.graphics.getWidth() + "x" + Gdx.graphics.getHeight());
+                Color secClr   = new Color(0.55f, 0.75f, 1.00f, 1f);
+                Color lblClr   = new Color(0.85f, 0.92f, 1.00f, 1f);
+                float labelX   = rDialog.x + rDialog.width * 0.10f;
+                float rowCY_R  = rBtnResolution.y + rBtnResolution.height * 0.5f;
+                float rowCY_F  = rBtnFullscreen.y  + rBtnFullscreen.height  * 0.5f;
 
-                if (showResolutionDropdown) {
-                    if (cachedModes.isEmpty()) {
-                        com.badlogic.gdx.Graphics.DisplayMode cur = Gdx.graphics.getDisplayMode();
-                        int[] basicWidths = {1280, 1366, 1600, 1920, 2560, 3840};
-                        for (com.badlogic.gdx.Graphics.DisplayMode m : Gdx.graphics.getDisplayModes()) {
-                            if (m.refreshRate != cur.refreshRate) continue;
-                            boolean ok = false;
-                            for (int bw : basicWidths) if (m.width == bw) { ok = true; break; }
-                            if (!ok) continue;
-                            boolean dup = false;
-                            for (com.badlogic.gdx.Graphics.DisplayMode e : cachedModes)
-                                if (e.width == m.width && e.height == m.height) { dup = true; break; }
-                            if (!dup) cachedModes.add(m);
-                        }
-                        cachedModes.sort((a, b) -> a.width != b.width
-                                ? Integer.compare(a.width, b.width)
-                                : Integer.compare(a.height, b.height));
-                    }
-                    float itemH = rDrop.height * 0.8f, listY = rDrop.y - itemH;
-                    for (int i = 0; i < cachedModes.size(); i++) {
-                        com.badlogic.gdx.Graphics.DisplayMode m = cachedModes.get(i);
-                        drawButton(new Rectangle(rDrop.x, listY - i * itemH, rDrop.width, itemH),
-                                m.width + "x" + m.height);
-                    }
-                }
+                // ── DISPLAY section header ────────────────────────────────────
+                float secLineY = rBtnResolution.y + rBtnResolution.height + rDialog.height * 0.10f;
+                drawLeft(smallFont, "DISPLAY", labelX, secLineY + smallFont.getLineHeight() * 1.1f, secClr);
+                final float sl = secLineY;
+                blend(() -> {
+                    shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
+                    shapeRenderer.setColor(secClr.r, secClr.g, secClr.b, 0.28f);
+                    shapeRenderer.rect(labelX, sl, rDialog.width * 0.80f, 1f);
+                    shapeRenderer.end();
+                });
+
+                // ── Row: Resolution ───────────────────────────────────────────
+                // label vertically centred on row
+                drawLeft(smallFont, "Resolution", labelX,
+                        rowCY_R + smallFont.getLineHeight() * 0.5f, lblClr);
+                int[] res = RESOLUTIONS[resolutionIndex];
+                drawButton(rBtnResolution, "< " + res[0] + " x " + res[1] + " >");
+
+                // ── Row: Fullscreen ───────────────────────────────────────────
+                drawLeft(smallFont, "Fullscreen", labelX,
+                        rowCY_F + smallFont.getLineHeight() * 0.5f, lblClr);
+                boolean isFs = Gdx.graphics.isFullscreen();
+                drawButtonColored(rBtnFullscreen, isFs ? "ON" : "OFF",
+                        isFs ? new Color(0.18f, 0.65f, 0.35f, 1f)
+                             : new Color(0.42f, 0.46f, 0.62f, 1f));
+
                 drawButton(rDlgClose, "Back");
                 break;
+            }
 
             case EXIT:
                 drawCentered(buttonFont, "Exit", cx, hTY, Color.WHITE);
@@ -700,22 +713,30 @@ public class MainMenuScreen extends InputAdapter implements Screen {
             if (rDlgBtn1.contains(mx, my)) { confirmStart();           return true; }
             if (rDlgBtn2.contains(mx, my)) { dialog = Dialog.NONE;     return true; }
         } else if (dialog == Dialog.SETTINGS) {
-            Rectangle rDrop = new Rectangle(rField1.x,
-                    rField1.y + rField1.height * 0.5f, rField1.width, rField1.height);
-            if (showResolutionDropdown) {
-                float itemH = rDrop.height * 0.8f, listY = rDrop.y - itemH;
-                for (int i = 0; i < cachedModes.size(); i++) {
-                    if (new Rectangle(rDrop.x, listY - i * itemH, rDrop.width, itemH).contains(mx, my)) {
-                        Gdx.graphics.setFullscreenMode(cachedModes.get(i));
-                        showResolutionDropdown = false;
-                        return true;
+            if (rBtnResolution.contains(mx, my)) {
+                resolutionIndex = (resolutionIndex + 1) % RESOLUTIONS.length;
+                int[] r = RESOLUTIONS[resolutionIndex];
+                if (Gdx.graphics.isFullscreen()) {
+                    for (com.badlogic.gdx.Graphics.DisplayMode m : Gdx.graphics.getDisplayModes()) {
+                        if (m.width == r[0] && m.height == r[1]) {
+                            Gdx.graphics.setFullscreenMode(m); break;
+                        }
                     }
+                } else {
+                    Gdx.graphics.setWindowedMode(r[0], r[1]);
                 }
-                showResolutionDropdown = false;
                 return true;
             }
-            if (rDrop    .contains(mx, my)) { showResolutionDropdown = true;                        return true; }
-            if (rDlgClose.contains(mx, my)) { dialog = Dialog.NONE; showResolutionDropdown = false; return true; }
+            if (rBtnFullscreen.contains(mx, my)) {
+                if (Gdx.graphics.isFullscreen()) {
+                    int[] r = RESOLUTIONS[resolutionIndex];
+                    Gdx.graphics.setWindowedMode(r[0], r[1]);
+                } else {
+                    Gdx.graphics.setFullscreenMode(Gdx.graphics.getDisplayMode());
+                }
+                return true;
+            }
+            if (rDlgClose.contains(mx, my)) { dialog = Dialog.NONE; return true; }
         } else if (dialog == Dialog.EXIT) {
             if (rDlgBtn1.contains(mx, my)) { Gdx.app.exit();       return true; }
             if (rDlgBtn2.contains(mx, my)) { dialog = Dialog.NONE; return true; }

@@ -588,8 +588,8 @@ public class MainMenuScreen extends InputAdapter implements Screen {
                              : new Color(0.42f, 0.46f, 0.62f, 1f));
 
                 float msz = Math.min(rDialog.width * 0.22f, rDialog.height * 0.30f);
-                float mx2 = rDialog.x + rDialog.width  - msz - rDialog.width  * 0.04f;
-                float my2 = rDialog.y + rDialog.height - msz - rDialog.height * 0.16f;
+                float mx2 = rDialog.x + rDialog.width * 0.04f;
+                float my2 = rDialog.y + rDialog.height * 0.04f;
                 game.batch.begin();
                 game.batch.setColor(1f, 1f, 1f, 1f);
                 game.batch.draw(texSettingsMeme, mx2, my2, msz, msz);
